@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import { Jost } from "next/font/google";
 import "./globals.css";
 
-const inter = Jost({ subsets: ["latin"] });
+const jost = Jost({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Half Dozen: A Pokemon Team Builder",
   description: "",
-};
+}
 
 export default function RootLayout({
   children,
@@ -16,7 +16,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={jost.className}>{children}</body>
     </html>
   );
 }

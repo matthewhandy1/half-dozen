@@ -1,6 +1,85 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+
+.normal {
+  background-color:#A8A878;
+}
+
+.fire {
+  background-color: #F08030;
+}
+
+.water {
+  background-color:#6890F0;
+}
+
+.electric {
+  background-color:#F8D030;
+}
+
+.grass {
+  background-color:#78C850;
+}
+
+.ice {
+  background-color:#98D8D8;
+}
+
+.fighting {
+  background-color:#C03028;
+}
+
+.poison {
+  background-color:#A040A0;
+}
+
+.ground {
+  background-color:#E0C068;
+}
+
+.flying {
+  background-color:#A890F0;
+}
+
+.psychic {
+  background-color:#F85888;
+}
+
+.bug {
+  background-color:#A8B820;
+}
+
+.rock {
+  background-color:#B8A038;
+}
+
+.ghost {
+  background-color:#705898;
+}
+
+.dragon {
+  background-color:#7038F8;
+}
+
+.dark {
+  background-color:#705848;
+}
+
+.steel {
+  background-color:#B8B8D0;
+}
+
+.fairy {
+  background-color:#EE99AC;
+}
+
+body {
+  background-color: #121824;
+}
+
+.header {
+  margin: 1em 0;
+  text-align: center;
+}
+
 
 .header-container {
   display: flex;
@@ -15,4 +94,192 @@
 
 body {
   background-color: #121212;
+
+.pokemonSelections {
+  width:100%;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 0rem;
+}
+
+
+.typeIcon {
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin: 5px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  text-transform: uppercase;
+  font-size: 12px;
+  display: block;
+  text-align: center;
+}
+
+.card {
+  border-radius: 10px;
+  box-shadow: 4px 2px 10px rgba(0, 0, 0, 0.8); 
+  background: #333;
+  padding: 20px;
+  margin: 10px;
+  min-height: 400px;
+  flex-grow: 1;
+}
+
+input {
+  background-color: #333;
+  color: white;
+  border: 1px solid #555;
+  border-radius: 5px;
+  padding: 5px;
+  margin-bottom: 5px;
+}
+
+select {
+  background-color: #555;
+  color: white;
+  padding: 5px;
+  border-radius: 5px;
+  margin-bottom: 5px;
+}
+
+.selectedPokemonRow {
+  display: flex; 
+  flex-direction: row;
+  
+}
+
+/* Style for the container of Pokemon sprite and types */
+.pokemon-info {
+  display: flex; /* Use flexbox to arrange items horizontally */
+  align-items: center; /* Align items vertically in the center */
+}
+
+/* Style for the container of Pokemon sprite */
+.pokemon-image {
+  flex: 1; /* Make the image container take up 50% of the available space */
+  text-align: center; /* Center the image horizontally */
+}
+
+/* Style for the container of Pokemon types */
+.pokemon-types {
+  flex: 1; /* Make the types container take up 50% of the available space */
+}
+
+.custom-type-wrap input, .custom-type-wrap select {
+  display: block;
+}
+
+
+
+.stats-bar-chart {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-bar {
+  display: flex;
+  margin-bottom: 8px;
+}
+
+.stat-name {
+  width: 80px; /* Adjust as needed */
+  margin-right: 0px;
+  text-align: left;
+  color: white;
+}
+
+.stat-value {
+  height: 20px; /* Adjust as needed */
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  font-size: 12px;
+}
+
+table {
+  border-collapse: collapse;
+  padding: 10px;
+}
+
+td {
+  color:white;
+  border: 1px solid #fff;
+  padding: 0.25em;
+  text-align: center;
+  font-weight: bold;
+  font-size:14px;
+}
+
+td.typeIcon {
+  border: none;
+  text-align: center;
+  font-weight: 400;
+}
+
+.typeChartWrap {
+  overflow-x: auto; /* Enable horizontal scrolling */
+  padding: 0 10px; /* Add padding to create space around the chart */
+  flex-grow: 1;
+}
+
+.typeChartandStatsWrap {
+  width: 100%;
+  justify-content: space-evenly;
+  padding: 1em;
+  margin-bottom: 10rem;
+}
+
+.typeChartSlot, td {
+  width: 75px;
+}
+
+.typeChartSlot img {
+  margin: 0 auto;
+  width: 70px!important;
+  max-width: none!important;
+}
+
+.averageStats {
+  flex-grow:1;
+}
+
+.green-text {
+  color: #78C850
+}
+
+.red-text {
+  color: #C03028;
+}
+
+.load-save-wrap {
+  max-width: 15%;
+}
+
+.load-wrap {
+  margin-bottom: 1rem;
+}
+
+@media screen and (max-width: 1500px) and (min-width: 1000px) {
+  .card {
+    width: calc(33% - 1rem);
+    margin: 0.5rem;
+  }  
+}
+
+@media screen and (max-width: 768px) {
+  .typeChartSlot {
+    font-size: 0.8rem; /* Reduce font size for better readability */
+  }
+
+  .typeChartSlot img {
+    max-width: 40px!important; /* Reduce the size of Pokemon sprites */
+  }
+}
+
+/* Media query for even smaller screen sizes */
+@media screen and (max-width: 480px) {
+  .card {
+    width: calc(100% - 1rem); /* Adjust margin as needed */
+  }
+}
 }
