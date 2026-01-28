@@ -231,7 +231,6 @@ const App: React.FC = () => {
   const handleExportMasterKey = () => {
     const pkg: MasterSyncPackage = { profile, team, box, teams, enemyTeams, version: "6.0" };
     const jsonStr = JSON.stringify(pkg);
-    // Safe base64 for Unicode/UTF-8
     return btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (match, p1) => 
       String.fromCharCode(parseInt(p1, 16))
     ));
@@ -239,7 +238,6 @@ const App: React.FC = () => {
 
   const handleImportMasterKey = (key: string) => {
     try {
-      // Decode base64 to Unicode string
       const jsonStr = decodeURIComponent(Array.prototype.map.call(atob(key), (c) => 
         '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
       ).join(''));
@@ -319,7 +317,6 @@ const App: React.FC = () => {
                 <button 
                   onClick={handleSaveAllToBox}
                   disabled={isTeamEmpty}
-                  title="Stash all to box"
                   className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl border transition-all text-[10px] font-black uppercase tracking-widest italic shadow-lg active:scale-95 disabled:opacity-30 ${
                     showBulkStashFeedback 
                       ? 'bg-emerald-600 border-emerald-500 text-white' 
@@ -344,7 +341,6 @@ const App: React.FC = () => {
                 <button 
                   onClick={handleClearTeam} 
                   disabled={isTeamEmpty} 
-                  title="Clear Team"
                   className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-800 hover:bg-red-950/40 text-slate-400 hover:text-red-400 rounded-xl font-bold transition-all border border-slate-700 disabled:opacity-30"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -366,7 +362,7 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 lg:gap-3 xl:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 lg:gap-3 xl:gap-6 items-stretch">
             {team.map((pokemon, idx) => (
               <PokemonCard key={idx} index={idx} pokemon={pokemon} onSelect={handleSelectPokemon} onSaveToBox={handleSaveToBox} pokemonList={pokemonList} allMovesList={allMovesList} allItemsList={allItemsList} />
             ))}
@@ -400,7 +396,6 @@ const App: React.FC = () => {
         </button>
       </div>
 
-      {/* Name Team Modal */}
       {isNamingTeam && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95">

@@ -34,9 +34,6 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
   
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Changed from h-[...] to min-h-[...] to allow the card to expand if content overflows
-  const cardFixedClassName = "min-h-[420px] sm:min-h-[450px] lg:min-h-[480px]";
-
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -125,26 +122,25 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
     borderColor: pokemon.dominantColors ? `${pokemon.dominantColors[0]}40` : `#ffffff15`
   } : {};
 
-  // Find influential abilities
   const influentialAbilities = pokemon?.abilities.filter(a => 
     INFLUENTIAL_ABILITIES.includes(a.name.toLowerCase())
   ) || [];
 
   return (
     <>
-      <div className={`flex flex-col min-w-0 group/card relative z-0 hover:z-50 ${cardFixedClassName}`} ref={dropdownRef}>
+      <div className="flex flex-col h-full group/card relative z-0 hover:z-50" ref={dropdownRef}>
         <div 
-          className={`bg-slate-900 rounded-[2.5rem] shadow-xl border border-slate-800 transition-all duration-300 w-full h-full flex flex-col ${saving ? 'ring-2 ring-emerald-500 shadow-emerald-500/20' : ''}`} 
+          className={`bg-slate-900 rounded-[2rem] sm:rounded-[2.5rem] shadow-xl border border-slate-800 transition-all duration-300 w-full h-full flex flex-col ${saving ? 'ring-2 ring-emerald-500 shadow-emerald-500/20' : ''}`} 
           style={cardBackgroundStyle}
         >
           {!pokemon ? (
-            <div className="p-6 flex-1 flex flex-col items-center justify-center min-h-full">
-              <p className="text-slate-600 font-black uppercase tracking-[0.2em] text-[10px] mb-4 italic">Slot {index + 1}</p>
+            <div className="p-6 flex-1 flex flex-col items-center justify-center">
+              <p className="text-slate-600 font-black uppercase tracking-[0.2em] text-[10px] mb-6 italic">Slot {index + 1}</p>
               <div className="w-full relative z-10 px-2">
                 <input 
                   type="text" 
                   placeholder="Designate..." 
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-slate-100 font-bold text-xs uppercase text-center italic" 
+                  className="w-full px-4 py-4 rounded-2xl bg-slate-950 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-slate-100 font-bold text-xs uppercase text-center italic" 
                   value={searchTerm} 
                   onFocus={() => setIsPkmnOpen(true)} 
                   onChange={(e) => { setSearchTerm(e.target.value); setIsPkmnOpen(true); setHighlightedIndex(0); }}
@@ -166,19 +162,19 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col relative p-4 sm:p-5 gap-2 h-full cursor-pointer sm:cursor-default items-center" onClick={() => { if(window.innerWidth < 1024) setIsArchitectOpen(true); }}>
+            <div className="flex-1 flex flex-col relative p-4 sm:p-5 gap-1 h-full cursor-pointer sm:cursor-default items-center" onClick={() => { if(window.innerWidth < 1024) setIsArchitectOpen(true); }}>
               
-              {/* TOP CONTROLS (Absolute Positioned) */}
+              {/* TOP CONTROLS */}
               <div className="hidden lg:flex absolute top-4 left-4 z-20 gap-2">
                 <div className="relative group">
                   <button onClick={(e) => { e.stopPropagation(); setTempNickname(pokemon.nickname || pokemon.name); setIsEditing(!isEditing); }} className={`p-2 rounded-xl transition-all active:scale-95 ${isEditing ? 'text-indigo-400 bg-indigo-500/10' : 'bg-slate-800/60 hover:bg-indigo-600/30 text-slate-400'}`}>
-                    <Edit3 className="w-4 h-4" />
+                    <Edit3 className="w-3.5 h-3.5" />
                   </button>
                   <ControlTooltip text="Label" />
                 </div>
                 <div className="relative group">
                   <button onClick={(e) => { e.stopPropagation(); handleSaveInstance(); }} className={`p-2 rounded-xl transition-all active:scale-95 ${saving ? 'bg-emerald-600 text-white shadow-emerald-500/40' : 'bg-slate-800/60 hover:bg-slate-700/80 text-slate-400'}`}>
-                    {saving ? <Check className="w-4 h-4" /> : <Disc className="w-4 h-4" />}
+                    {saving ? <Check className="w-3.5 h-3.5" /> : <Disc className="w-3.5 h-3.5" />}
                   </button>
                   <ControlTooltip text="Stash" />
                 </div>
@@ -186,29 +182,28 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
 
               <div className="hidden lg:flex absolute top-4 right-4 gap-2 z-20">
                 <div className="relative group">
-                  <button onClick={(e) => { e.stopPropagation(); onSelect(index, null); }} className="p-2 rounded-xl bg-slate-800/60 hover:bg-red-600/30 hover:text-red-400 text-slate-400 transition-all active:scale-95"><X className="w-4 h-4" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); onSelect(index, null); }} className="p-2 rounded-xl bg-slate-800/60 hover:bg-red-600/30 hover:text-red-400 text-slate-400 transition-all active:scale-95"><X className="w-3.5 h-3.5" /></button>
                   <ControlTooltip text="Clear" />
                 </div>
               </div>
 
               {/* Header Info (Sprite & Name) */}
               <div className="flex flex-col items-center shrink-0 w-full relative">
-                <div className={`relative w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 transition-transform duration-500 ${saving ? 'animate-bounce' : ''} flex items-center justify-center`}>
+                <div className={`relative w-16 h-16 sm:w-18 sm:h-18 lg:w-20 lg:h-20 transition-transform duration-500 ${saving ? 'animate-bounce' : ''} flex items-center justify-center`}>
                   <img src={pokemon.sprite} alt={pokemon.name} className="w-full h-full relative object-contain drop-shadow-2xl" />
                 </div>
                 {!isEditing && (
-                  <div className="text-center px-1 w-full flex flex-col items-center mt-1">
-                    <h3 className="text-xs sm:text-sm font-black text-slate-100 uppercase italic truncate text-center max-w-full px-1 tracking-tight leading-none mb-2">
+                  <div className="text-center px-1 w-full flex flex-col items-center">
+                    <h3 className="text-xs sm:text-sm font-black text-slate-100 uppercase italic truncate text-center max-w-full px-1 tracking-tight leading-none mb-1.5">
                       {pokemon.nickname || pokemon.name}
                     </h3>
                     
-                    {/* Meta Row: Standardized widths for types, Abilities pushed to right */}
-                    <div className="relative flex items-center justify-center w-full min-h-[22px] px-1">
+                    <div className="relative flex items-center justify-center w-full min-h-[20px] px-1">
                       <div className="flex flex-wrap gap-1 items-center justify-center">
                         {(pokemon.customTypes || pokemon.types.map(t => t.name)).map((tName, i) => (
                           <span 
                             key={i} 
-                            className="inline-flex items-center justify-center w-12 sm:w-14 h-4 sm:h-5 rounded-md text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-white ring-1 ring-inset ring-white/10 shadow-sm" 
+                            className="inline-flex items-center justify-center w-11 sm:w-12 h-3.5 sm:h-4 rounded-md text-[7px] sm:text-[8px] font-black uppercase tracking-widest text-white ring-1 ring-inset ring-white/10 shadow-sm" 
                             style={{ 
                                 backgroundColor: TYPE_COLORS[tName] || '#777',
                                 backgroundImage: 'linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1))'
@@ -219,19 +214,18 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
                         ))}
                       </div>
 
-                      {/* Ability Toggles absolute on the right to preserve type centering */}
-                      <div className="absolute right-0 flex gap-1 items-center">
+                      <div className="absolute right-0 flex gap-0.5 items-center">
                         {influentialAbilities.map(ability => (
                           <div className="relative group" key={ability.name}>
                             <button
                               onClick={(e) => { e.stopPropagation(); handleToggleAbility(ability.name); }}
-                              className={`inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-md transition-all active:scale-95 border ${
+                              className={`inline-flex items-center justify-center w-4.5 h-4.5 sm:w-5 sm:h-5 rounded-md transition-all active:scale-95 border ${
                                 pokemon.selectedAbility === ability.name 
-                                ? 'bg-indigo-600 text-white border-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.3)]' 
+                                ? 'bg-indigo-600 text-white border-indigo-400 shadow-[0_0_6px_rgba(99,102,241,0.3)]' 
                                 : 'bg-slate-800/60 text-slate-600 border-slate-700/50 hover:text-slate-400'
                               }`}
                             >
-                              <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                              <ShieldCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                             </button>
                             <ControlTooltip text={`Passive: ${ability.name.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ')}`} />
                           </div>
@@ -243,22 +237,22 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
               </div>
 
               {/* Main Content (Moveset) */}
-              <div className="flex-1 flex flex-col w-full mt-3 justify-start">
+              <div className="flex-1 flex flex-col w-full mt-2 justify-start pb-1">
                 {isEditing ? (
-                  <div className="flex flex-col gap-3 animate-in slide-in-from-top-1 duration-200 px-1" onClick={e => e.stopPropagation()}>
+                  <div className="flex flex-col gap-2 animate-in slide-in-from-top-1 duration-200 px-1" onClick={e => e.stopPropagation()}>
                     <input 
                       autoFocus 
-                      className="w-full bg-slate-950 border border-slate-800 text-[10px] font-black text-white py-2.5 px-4 rounded-xl outline-none uppercase italic" 
+                      className="w-full bg-slate-950 border border-slate-800 text-[10px] font-black text-white py-2 px-3 rounded-xl outline-none uppercase italic" 
                       value={tempNickname} 
                       onChange={e => setTempNickname(e.target.value)}
                       onBlur={handleSaveNickname}
                       placeholder="Nickname..."
                     />
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-1.5">
                       {[0, 1].map(i => (
                         <select 
                           key={i} 
-                          className="w-full bg-slate-950 text-[10px] font-black uppercase rounded-xl p-2.5 border border-slate-800 text-slate-400 outline-none" 
+                          className="w-full bg-slate-950 text-[9px] font-black uppercase rounded-xl p-2 border border-slate-800 text-slate-400 outline-none" 
                           value={(pokemon.customTypes || pokemon.types.map(t => t.name))[i] || 'none'} 
                           onChange={(e) => handleTypeChange(i, e.target.value)}
                         >
@@ -267,27 +261,25 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
                         </select>
                       ))}
                     </div>
-                    <button onClick={() => { handleSaveNickname(); setIsEditing(false); }} className="w-full py-3 bg-indigo-600 text-white text-[10px] font-black uppercase italic rounded-xl shadow-md">Confirm</button>
+                    <button onClick={() => { handleSaveNickname(); setIsEditing(false); }} className="w-full py-2.5 bg-indigo-600 text-white text-[9px] font-black uppercase italic rounded-xl shadow-md">Confirm</button>
                   </div>
                 ) : (
-                  <div className="flex-1 flex flex-col justify-start">
-                    <div className="flex flex-col gap-1.5 pt-4 border-t border-slate-800/40">
-                      <div className="flex justify-center mb-1">
-                        <p className="text-[9px] font-black text-slate-100 uppercase tracking-[0.2em] px-3 py-1 bg-slate-800/60 rounded-full border border-slate-700/50 shadow-inner">Offensive Coverage</p>
-                      </div>
-                      <div className="grid grid-cols-1 gap-1.5">
-                        {[0, 1, 2, 3].map(i => (
-                          <MoveSearchSelector 
-                            key={i} 
-                            selectedMove={pokemon.selectedMoves[i]} 
-                            onChange={(val) => handleMoveChange(i, val)} 
-                            placeholder={`Move ${i+1}`} 
-                            options={pokemon.availableMoves} 
-                            globalOptions={allMovesList} 
-                            openUpwards={i > 1}
-                          />
-                        ))}
-                      </div>
+                  <div className="flex flex-col gap-1 pt-3 border-t border-slate-800/40">
+                    <div className="flex justify-center mb-0.5">
+                      <p className="text-[7px] sm:text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Offensive Coverage</p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-1">
+                      {[0, 1, 2, 3].map(i => (
+                        <MoveSearchSelector 
+                          key={i} 
+                          selectedMove={pokemon.selectedMoves[i]} 
+                          onChange={(val) => handleMoveChange(i, val)} 
+                          placeholder={`Move ${i+1}`} 
+                          options={pokemon.availableMoves} 
+                          globalOptions={allMovesList} 
+                          openUpwards={i > 1}
+                        />
+                      ))}
                     </div>
                   </div>
                 )}
