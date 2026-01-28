@@ -34,8 +34,8 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
   
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Precise fixed height for matrix-focused usage
-  const cardFixedClassName = "h-[340px] sm:h-[380px] lg:h-[400px]";
+  // Changed from h-[...] to min-h-[...] to allow the card to expand if content overflows
+  const cardFixedClassName = "min-h-[420px] sm:min-h-[450px] lg:min-h-[480px]";
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -138,7 +138,7 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
           style={cardBackgroundStyle}
         >
           {!pokemon ? (
-            <div className="p-6 flex-1 flex flex-col items-center justify-center h-full">
+            <div className="p-6 flex-1 flex flex-col items-center justify-center min-h-full">
               <p className="text-slate-600 font-black uppercase tracking-[0.2em] text-[10px] mb-4 italic">Slot {index + 1}</p>
               <div className="w-full relative z-10 px-2">
                 <input 
@@ -243,7 +243,7 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
               </div>
 
               {/* Main Content (Moveset) */}
-              <div className="flex-1 flex flex-col w-full mt-3 justify-center">
+              <div className="flex-1 flex flex-col w-full mt-3 justify-start">
                 {isEditing ? (
                   <div className="flex flex-col gap-3 animate-in slide-in-from-top-1 duration-200 px-1" onClick={e => e.stopPropagation()}>
                     <input 
@@ -270,7 +270,7 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
                     <button onClick={() => { handleSaveNickname(); setIsEditing(false); }} className="w-full py-3 bg-indigo-600 text-white text-[10px] font-black uppercase italic rounded-xl shadow-md">Confirm</button>
                   </div>
                 ) : (
-                  <div className="flex-1 flex flex-col justify-center">
+                  <div className="flex-1 flex flex-col justify-start">
                     <div className="flex flex-col gap-1.5 pt-4 border-t border-slate-800/40">
                       <div className="flex justify-center mb-1">
                         <p className="text-[9px] font-black text-slate-100 uppercase tracking-[0.2em] px-3 py-1 bg-slate-800/60 rounded-full border border-slate-700/50 shadow-inner">Offensive Coverage</p>
@@ -284,6 +284,7 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
                             placeholder={`Move ${i+1}`} 
                             options={pokemon.availableMoves} 
                             globalOptions={allMovesList} 
+                            openUpwards={i > 1}
                           />
                         ))}
                       </div>
