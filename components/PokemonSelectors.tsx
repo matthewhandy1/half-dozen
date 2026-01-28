@@ -6,19 +6,23 @@ import { TYPE_COLORS } from '../constants';
 import { fetchMoveDetails } from '../services/pokeApi';
 import { MoveTooltip, CategoryIcon } from './PokemonSharedUI';
 
+interface MoveSearchSelectorProps {
+  selectedMove: SelectedMove;
+  onChange: (val: string) => void | Promise<void>;
+  placeholder: string;
+  options: string[];
+  globalOptions: string[];
+  openUpwards?: boolean;
+}
+
 export const MoveSearchSelector = React.memo(({
   selectedMove,
   onChange,
   placeholder,
   options,
   globalOptions,
-}: {
-  selectedMove: SelectedMove;
-  onChange: (val: string) => void;
-  placeholder: string;
-  options: string[];
-  globalOptions: string[];
-}) => {
+  openUpwards = false,
+}: MoveSearchSelectorProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState(selectedMove.name);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -110,7 +114,7 @@ export const MoveSearchSelector = React.memo(({
         {tooltipData && <MoveTooltip move={tooltipData} visible={showTooltip} />}
       </div>
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-[210] max-h-48 overflow-y-auto scrollbar-thin">
+        <div className={`absolute left-0 right-0 ${openUpwards ? 'bottom-full mb-1' : 'top-full mt-1'} bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-[210] max-h-48 overflow-y-auto scrollbar-thin`}>
           {filtered.length > 0 ? filtered.map((m, idx) => (
             <button key={m} className={`w-full text-left px-4 py-2.5 text-[10px] font-bold transition-colors border-b border-slate-800 last:border-0 group flex items-center justify-between ${highlightedIndex === idx ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`} onClick={() => { onChange(m); setIsOpen(false); }}>
               <span className="uppercase">{m}</span>
