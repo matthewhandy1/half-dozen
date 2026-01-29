@@ -126,6 +126,9 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
     INFLUENTIAL_ABILITIES.includes(a.name.toLowerCase())
   ) || [];
 
+  // Extract moves pool to a stable constant to avoid TS narrowing issues inside map loops
+  const movesPool = pokemon?.availableMoves ?? [];
+
   return (
     <>
       <div className="flex flex-col h-full group/card relative z-0 hover:z-50" ref={dropdownRef}>
@@ -275,7 +278,7 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
                           selectedMove={pokemon.selectedMoves[i]} 
                           onChange={(val) => handleMoveChange(i, val)} 
                           placeholder={`Move ${i+1}`} 
-                          options={pokemon.availableMoves} 
+                          options={movesPool} 
                           globalOptions={allMovesList} 
                           openUpwards={i > 1}
                         />
@@ -354,7 +357,7 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
               <h3 className="text-sm font-black text-slate-500 uppercase tracking-[0.2em] mb-6">Offensive spread</h3>
               <div className="grid grid-cols-1 gap-4">
                 {[0, 1, 2, 3].map(i => (
-                  <MoveSearchSelector key={i} selectedMove={pokemon.selectedMoves[i]} onChange={(val) => handleMoveChange(i, val)} placeholder={`Move ${i+1}`} options={pokemon.availableMoves} globalOptions={allMovesList} />
+                  <MoveSearchSelector key={i} selectedMove={pokemon.selectedMoves[i]} onChange={(val) => handleMoveChange(i, val)} placeholder={`Move ${i+1}`} options={movesPool} globalOptions={allMovesList} />
                 ))}
               </div>
             </section>

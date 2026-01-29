@@ -79,7 +79,7 @@ export const TypeChart: React.FC<TypeChartProps> = ({ team }) => {
         <table className="w-full table-fixed border-collapse">
           <thead>
             <tr>
-              <th className="h-12 sm:h-20 p-1 sm:p-3 border border-slate-800 bg-slate-950 text-slate-500 text-[7px] sm:text-[10px] uppercase font-black w-[45px] sm:w-20">ATK</th>
+              <th className="h-12 sm:h-20 p-1 sm:p-3 border border-slate-800 bg-slate-950 text-slate-500 text-[7px] sm:text-[10px] uppercase font-black w-[50px] sm:w-20">ATK</th>
               {team.map((p, i) => (
                 <th key={i} className="h-12 sm:h-20 p-1 sm:p-3 border border-slate-800 bg-slate-950">
                   {p ? (
@@ -98,12 +98,12 @@ export const TypeChart: React.FC<TypeChartProps> = ({ team }) => {
               return (
                 <tr key={type} className="hover:bg-slate-800/20">
                   <td className="p-0.5 sm:p-1 border border-slate-800 bg-slate-900">
-                    <div className="w-full py-1 sm:py-2 rounded sm:rounded-lg text-white text-[6px] sm:text-[9px] font-black uppercase text-center shadow-lg ring-1 ring-inset ring-white/10" 
+                    <div className="w-full py-1 sm:py-2 rounded sm:rounded-lg text-white text-[6px] sm:text-[9px] font-black uppercase text-center shadow-lg ring-1 ring-inset ring-white/10 overflow-hidden whitespace-nowrap" 
                       style={{ 
                         backgroundColor: TYPE_COLORS[type],
                         backgroundImage: 'linear-gradient(rgba(0,0,0,0.15), rgba(0,0,0,0.15))',
                       }}>
-                      {type.substring(0, 3)}
+                      {type}
                     </div>
                   </td>
                   {team.map((p, i) => {
