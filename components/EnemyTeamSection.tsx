@@ -212,34 +212,54 @@ const RivalMatchupMatrix: React.FC<{ userTeam: PokemonTeam, enemyTeam: PokemonTe
     });
     return maxMultiplier;
   };
+
   const activeUser = userTeam.filter((p): p is NonNullable<typeof p> => p !== null);
   const activeEnemy = enemyTeam.filter((p): p is NonNullable<typeof p> => p !== null);
   if (activeUser.length === 0 || activeEnemy.length === 0) return null;
+
   return (
-    <div className="bg-slate-900 rounded-3xl sm:rounded-[2.5rem] p-4 sm:p-8 shadow-2xl border border-slate-800 w-full overflow-hidden">
-      <h3 className="text-lg sm:text-xl font-black text-white uppercase italic tracking-tight mb-6 px-2 flex items-center gap-3"><Sword className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" /> Matchup Matrix</h3>
-      <div className="w-full overflow-x-auto pb-2 scrollbar-thin">
-        <table className="w-full min-w-[500px] table-fixed border-collapse">
+    <div className="bg-slate-900 rounded-2xl sm:rounded-[2.5rem] p-3 sm:p-8 shadow-2xl border border-slate-800 w-full overflow-hidden">
+      <h3 className="text-lg sm:text-xl font-black text-white uppercase italic tracking-tight mb-6 px-1 flex items-center gap-3">
+        <Sword className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" /> Matchup Matrix
+      </h3>
+      <div className="w-full">
+        <table className="w-full table-fixed border-collapse">
           <thead>
             <tr>
-              <th className="p-3 border border-slate-800 bg-slate-950 text-slate-500 text-[10px] uppercase font-black w-20 sticky left-0 z-20">YOU \ RIVAL</th>
-              {activeEnemy.map((p, i) => (<th key={i} className="p-3 border border-slate-800 bg-slate-950"><img src={p.sprite} className="w-10 h-10 object-contain mx-auto" /></th>))}
+              <th className="p-1 sm:p-3 border border-slate-800 bg-slate-950 text-slate-500 text-[7px] sm:text-[10px] uppercase font-black w-[45px] sm:w-24">YOU \ RIVAL</th>
+              {activeEnemy.map((p, i) => (
+                <th key={i} className="p-1 sm:p-3 border border-slate-800 bg-slate-950">
+                  <img src={p.sprite} className="w-8 h-8 sm:w-10 sm:h-10 object-contain mx-auto" />
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {activeUser.map((userPkmn, i) => (
               <tr key={i}>
-                <td className="p-1 border border-slate-800 bg-slate-900 sticky left-0 z-20 backdrop-blur-md">
-                   <div className="flex flex-col items-center p-1">
-                     <img src={userPkmn.sprite} className="w-8 h-8 object-contain" />
-                     <span className="text-[8px] font-black text-slate-500 uppercase mt-1 truncate max-w-full text-center">{userPkmn.nickname || userPkmn.name}</span>
+                <td className="p-1 border border-slate-800 bg-slate-900">
+                   <div className="flex flex-col items-center">
+                     <img src={userPkmn.sprite} className="w-6 h-6 sm:w-8 sm:h-8 object-contain" />
+                     <span className="text-[6px] sm:text-[8px] font-black text-slate-500 uppercase mt-0.5 truncate max-w-full text-center">
+                       {userPkmn.nickname?.substring(0, 5) || userPkmn.name.substring(0, 5)}
+                     </span>
                    </div>
                 </td>
                 {activeEnemy.map((enemyPkmn, j) => {
                   const m = getBestUserEffectiveness(userPkmn, enemyPkmn);
                   return (
-                    <td key={j} className="p-1 border border-slate-800 bg-slate-900/40">
-                      <div className={`w-full py-2.5 rounded-lg text-xs font-black text-center border-2 ${m >= 2 ? 'bg-emerald-900/50 text-emerald-400 border-emerald-700' : m <= 0.5 ? 'bg-red-900/50 text-red-400 border-red-700' : 'bg-slate-800 text-slate-600 border-slate-700'}`}>{m === 0 ? '0' : m === 0.25 ? '¼' : m === 0.5 ? '½' : m}x</div>
+                    <td key={j} className="p-0.5 sm:p-1 border border-slate-800 bg-slate-900/40">
+                      <div className={`w-full py-1.5 sm:py-2.5 rounded sm:rounded-lg text-[8px] sm:text-xs font-black text-center border sm:border-2 ${
+                        m >= 2 
+                          ? 'bg-emerald-900/50 text-emerald-400 border-emerald-700' 
+                          : m <= 0.5 && m > 0 
+                            ? 'bg-red-900/50 text-red-400 border-red-700' 
+                            : m === 0 
+                              ? 'bg-slate-950 text-slate-700 border-slate-800'
+                              : 'bg-slate-800 text-slate-600 border-slate-700'
+                      }`}>
+                        {m === 0 ? '0' : m === 0.25 ? '¼' : m === 0.5 ? '½' : m}x
+                      </div>
                     </td>
                   );
                 })}

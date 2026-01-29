@@ -6,7 +6,7 @@ import {
   Save, Copy, Check, Upload, Trash2, Edit3, 
   Calendar, Trophy, User, RefreshCw,
   Share2, Zap, Download, Loader2, Dna,
-  UserCheck, BadgeCheck
+  UserCheck, BadgeCheck, AlertTriangle
 } from 'lucide-react';
 import { TYPE_COLORS } from '../constants';
 import { fetchPokemon, fetchMoveDetails, fetchItemDescription } from '../services/pokeApi';
@@ -23,12 +23,15 @@ interface VaultModalProps {
   onRenameTeam: (id: string, newName: string) => void;
   onLoadTeam: (team: PokemonTeam) => void;
   onAddTeam: (team: SavedTeam) => void;
+  onClearAllTeams: () => void;
   onDeleteBoxPkmn: (id: string) => void;
   onUpdateBoxNickname: (id: string, name: string) => void;
   onAddToTeamFromBox: (pokemon: BoxPokemon, slotIndex: number) => void;
   onAddBoxPkmn: (pokemon: BoxPokemon) => void;
+  onClearAllBox: () => void;
   onDeleteEnemyTeam: (id: string) => void;
   onLoadEnemyTeam: (team: PokemonTeam) => void;
+  onClearAllEnemyTeams: () => void;
   onExportMasterKey: () => string;
   onImportMasterKey: (key: string) => void;
 }
@@ -86,6 +89,9 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
   const [addingToSlot, setAddingToSlot] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tempRenameValue, setTempRenameValue] = useState('');
+  
+  // Clear confirmation states
+  const [confirmClearType, setConfirmClearType] = useState<'teams' | 'box' | 'intel' | null>(null);
 
   const [exchangeMode, setExchangeMode] = useState<'none' | 'import' | 'export'>('none');
   const [exchangeCode, setExchangeCode] = useState('');
@@ -129,6 +135,22 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
     }
   };
 
+  const handleClearAll = (type: 'teams' | 'box' | 'intel') => {
+    if (confirmClearType !== type) {
+      setConfirmClearType(type);
+      setTimeout(() => setConfirmClearType(null), 3000);
+      return;
+    }
+    
+    if (type === 'teams') props.onClearAllTeams();
+    else if (type === 'box') props.onClearAllBox();
+    else if (type === 'intel') props.onClearAllEnemyTeams();
+    
+    setConfirmClearType(null);
+    setExchangeFeedback("Archive Cleared");
+    setTimeout(() => setExchangeFeedback(null), 2000);
+  };
+
   const serializePkmnDNA = (p: PokemonData) => ({
     id: p.id,
     n: p.nickname || null,
@@ -151,7 +173,6 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
       }
       const payload = { v: 2, t: type === 'pkmn' ? 'p' : 't', d: compactData };
       const jsonStr = JSON.stringify(payload);
-      // Safe base64 for Unicode
       const code = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (match, p1) => 
         String.fromCharCode(parseInt(p1, 16))
       ));
@@ -195,7 +216,6 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
     if (!exchangeCode.trim()) return;
     setIsProcessing(true);
     try {
-      // Decode base64 to Unicode string
       const jsonStr = decodeURIComponent(Array.prototype.map.call(atob(exchangeCode.trim()), (c) => 
         '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
       ).join(''));
@@ -252,9 +272,39 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
     </div>
   );
 
+  const ClearAllButton = ({ type, count }: { type: 'teams' | 'box' | 'intel', count: number }) => {
+    if (count === 0) return null;
+    const isConfirming = confirmClearType === type;
+    
+    return (
+      <button 
+        onClick={() => handleClearAll(type)}
+        className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl font-black uppercase text-[8px] sm:text-[10px] transition-all border shadow-lg ${
+          isConfirming 
+            ? 'bg-red-600 border-red-500 text-white animate-pulse' 
+            : 'bg-slate-950/50 border-slate-800 text-slate-600 hover:text-red-500 hover:border-red-900/40'
+        }`}
+      >
+        {isConfirming ? <AlertTriangle className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+        <span>{isConfirming ? 'Sure?' : 'Clear All'}</span>
+      </button>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-2 sm:p-6 bg-slate-950/95 backdrop-blur-xl animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-700 rounded-[2rem] sm:rounded-[3.5rem] shadow-2xl w-full max-w-6xl h-[95vh] sm:h-[85vh] flex flex-col sm:flex-row overflow-hidden animate-in zoom-in-95 duration-300 relative">
+      
+      {/* Mobile Top Exit Bar */}
+      <div className="sm:hidden absolute top-0 left-0 right-0 p-4 flex justify-end z-[350]">
+        <button 
+          onClick={props.onClose} 
+          className="p-3 bg-slate-800 text-white rounded-2xl shadow-xl active:scale-95 transition-transform"
+        >
+          <X className="w-6 h-6" />
+        </button>
+      </div>
+
+      <div className="bg-slate-900 border border-slate-700 rounded-[2rem] sm:rounded-[3.5rem] shadow-2xl w-full max-w-6xl h-[90vh] sm:h-[85vh] flex flex-col sm:flex-row overflow-hidden animate-in zoom-in-95 duration-300 relative mt-12 sm:mt-0">
         
         {/* DNA Exchange Overlay */}
         {exchangeMode !== 'none' && (
@@ -303,7 +353,7 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
             {tabs.map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setCurrentTab(tab.id)}
+                onClick={() => { setCurrentTab(tab.id); setConfirmClearType(null); }}
                 className={`flex flex-col sm:flex-row items-center gap-1 sm:gap-3 p-2 sm:px-4 sm:py-4 rounded-xl sm:rounded-2xl transition-all ${
                   currentTab === tab.id ? `${tab.bg} border border-white/10 shadow-lg` : 'hover:bg-slate-800 text-slate-500'
                 }`}
@@ -325,17 +375,26 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 bg-slate-900/40">
+        <div className="flex-1 flex flex-col min-w-0 bg-slate-900/40 overflow-hidden">
           <div className="px-4 py-4 sm:px-8 sm:py-8 border-b border-slate-800 flex items-center justify-between shrink-0">
             <h3 className="text-lg sm:text-2xl font-black text-white uppercase italic tracking-tight flex items-center gap-3">
               {tabs.find(t => t.id === currentTab)?.label}
             </h3>
-            <button onClick={props.onClose} className="p-2 text-slate-500 hover:text-white transition-colors bg-slate-800 rounded-lg sm:rounded-xl"><X className="w-5 h-5 sm:w-6 sm:h-6" /></button>
+            
+            <div className="flex items-center gap-3">
+              {currentTab === 'teams' && <ClearAllButton type="teams" count={props.teams.length} />}
+              {currentTab === 'box' && <ClearAllButton type="box" count={props.box.length} />}
+              {currentTab === 'intel' && <ClearAllButton type="intel" count={props.enemyTeams.length} />}
+              
+              <button onClick={props.onClose} className="hidden sm:block p-2 text-slate-500 hover:text-white transition-colors bg-slate-800 rounded-lg sm:rounded-xl">
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 sm:p-10 scrollbar-thin">
             {currentTab === 'profile' && (
-              <div className="space-y-8 sm:space-y-12 max-w-4xl mx-auto">
+              <div className="space-y-8 sm:space-y-12 max-w-4xl mx-auto pb-12">
                 <div className="bg-slate-950/50 border border-slate-800 rounded-[1.5rem] sm:rounded-[2.5rem] p-6 sm:p-12 relative overflow-hidden">
                   <div className="flex flex-col sm:flex-row gap-6 sm:gap-10 items-center">
                     <div className="w-32 h-32 sm:w-48 sm:h-48 bg-slate-900 rounded-[1.5rem] sm:rounded-[2.5rem] border-4 border-slate-800 flex items-center justify-center shadow-2xl shrink-0 overflow-hidden relative group/avatar">
@@ -427,7 +486,7 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
                   <div className="space-y-4">
                     <h4 className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 px-2"><Save className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Global Export</h4>
-                    <div className="bg-slate-950 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 space-y-4">
+                    <div className="bg-slate-950 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 space-y-4 shadow-xl">
                       <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase leading-relaxed italic">Full Archive of Vault Data</p>
                       <button onClick={handleCopyKey} className={`w-full py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black uppercase text-[10px] sm:text-xs transition-all flex items-center justify-center gap-2 ${copySuccess ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
                         {copySuccess ? <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />} Master Key
@@ -436,7 +495,7 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
                   </div>
                   <div className="space-y-4">
                     <h4 className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 px-2"><RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Global Restore</h4>
-                    <div className="bg-slate-950 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 space-y-4">
+                    <div className="bg-slate-950 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 space-y-4 shadow-xl">
                       <input className="w-full bg-slate-900 border border-slate-800 rounded-lg sm:rounded-xl p-3 text-[10px] font-mono text-indigo-300 outline-none" placeholder="Paste Master Key..." value={importKey} onChange={e => setImportKey(e.target.value)} />
                       <button onClick={handleImport} disabled={!importKey} className="w-full py-3 sm:py-4 bg-indigo-600 text-white rounded-xl sm:rounded-2xl font-black uppercase text-[10px] sm:text-xs shadow-lg active:scale-95 disabled:opacity-30">Import Archive</button>
                     </div>
@@ -446,7 +505,7 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
             )}
 
             {currentTab === 'teams' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pb-12">
                 {props.teams.length === 0 ? (
                   <div className="col-span-full py-20 text-center opacity-30"><Users className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4" /><p className="font-black uppercase tracking-widest italic text-xs sm:text-sm">No Teams Stored</p></div>
                 ) : props.teams.map(t => (
@@ -479,7 +538,7 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
             )}
 
             {currentTab === 'box' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 pb-12">
                 {props.box.length === 0 ? (
                   <div className="col-span-full py-20 text-center opacity-30"><Package className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4" /><p className="font-black uppercase tracking-widest italic text-xs sm:text-sm">The Box is Empty</p></div>
                 ) : props.box.map(p => (
@@ -523,7 +582,7 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
             )}
 
             {currentTab === 'intel' && (
-              <div className="space-y-3 sm:space-y-4">
+              <div className="space-y-3 sm:space-y-4 pb-12">
                 {props.enemyTeams.length === 0 ? (
                   <div className="py-20 text-center opacity-30"><ShieldAlert className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4" /><p className="font-black uppercase tracking-widest italic text-xs sm:text-sm">No Intel Logs</p></div>
                 ) : props.enemyTeams.map(t => (
@@ -539,7 +598,7 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
                     </div>
                     <div className="flex items-center gap-2 sm:gap-3 shrink-0 w-full sm:w-auto">
                       {t.id !== 'trainer-red-classic' && <button onClick={() => props.onDeleteEnemyTeam(t.id)} className="flex-1 sm:flex-none p-3.5 sm:p-3 bg-slate-900 text-slate-700 hover:text-red-500 rounded-lg sm:rounded-2xl transition-colors"><Trash2 className="w-5 h-5 sm:w-5 sm:h-5" /></button>}
-                      <button onClick={() => { props.onLoadEnemyTeam(t.pokemon as PokemonTeam); props.onClose(); }} className="flex-[2] sm:flex-none px-6 py-4 sm:px-6 sm:py-3 bg-red-900 text-white rounded-lg sm:rounded-2xl font-black uppercase text-[10px] sm:text-xs italic shadow-lg active:scale-95">Analyze</button>
+                      <button onClick={() => { props.onLoadEnemyTeam(t.pokemon as PokemonTeam); props.onClose(); }} className="flex-[2] sm:flex-none px-6 py-4 sm:px-6 sm:py-3 bg-red-900 text-white rounded-lg sm:rounded-2xl font-black uppercase italic text-[10px] sm:text-xs shadow-lg active:scale-95">Analyze</button>
                     </div>
                   </div>
                 ))}

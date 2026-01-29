@@ -5,11 +5,12 @@ import { TypeChart } from './components/TypeChart';
 import { OffensiveMatrix } from './components/OffensiveMatrix';
 import { TeamStats } from './components/TeamStats';
 import { VaultModal } from './components/VaultModal';
+import { InfoModal } from './components/InfoModal';
 import { EnemyTeamSection } from './components/EnemyTeamSection';
 import { PokemonData, PokemonTeam, BoxPokemon, SavedTeam, SavedEnemyTeam, UserProfile, MasterSyncPackage } from './types';
 import { fetchAllPokemonNames, fetchPokemon, fetchAllMoves, fetchAllItems, fetchPokemonBasic } from './services/pokeApi';
 import { STAT_ABBREVIATIONS } from './constants';
-import { Trash2, Save, Check, BarChart3, LayoutGrid, Fingerprint, PackagePlus, X, User, Loader2 } from 'lucide-react';
+import { Trash2, Save, Check, BarChart3, LayoutGrid, Fingerprint, PackagePlus, X, User, Loader2, Info } from 'lucide-react';
 
 const PokeballIcon: React.FC<{ className?: string }> = ({ className }) => (
   <div className={`relative w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 border-slate-950 overflow-hidden shadow-sm ${className}`}>
@@ -24,7 +25,7 @@ const HeaderTrainerSprite: React.FC<{ name: string }> = ({ name }) => {
   const url = `https://play.pokemonshowdown.com/sprites/trainers/${name}.png`;
 
   return (
-    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-slate-800 rounded-lg border border-slate-700 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+    <div className="w-full h-full flex items-center justify-center overflow-hidden shrink-0">
       {status === 'loading' && <Loader2 className="w-4 h-4 animate-spin text-slate-600" />}
       {status === 'error' && <User className="w-5 h-5 text-slate-700" />}
       <img 
@@ -48,6 +49,7 @@ const App: React.FC = () => {
   const [showBulkStashFeedback, setShowBulkStashFeedback] = useState(false);
   const [isNamingTeam, setIsNamingTeam] = useState(false);
   const [teamNameToSave, setTeamNameToSave] = useState('');
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
   
   const [vaultState, setVaultState] = useState<{ open: boolean, tab: 'profile' | 'teams' | 'box' | 'intel' }>({ open: false, tab: 'profile' });
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
@@ -284,21 +286,37 @@ const App: React.FC = () => {
             </div>
           </div>
           
-          <div className="flex items-center gap-4 sm:gap-8">
-            <div className="flex items-center gap-3 sm:gap-4 order-2 sm:order-1 group cursor-pointer" onClick={() => setVaultState({ open: true, tab: 'profile' })}>
+          <div className="flex items-center gap-2 sm:gap-4 h-11 sm:h-14">
+            {/* Trainer Profile Button */}
+            <div 
+              className="h-11 w-11 sm:h-auto sm:w-auto flex items-center gap-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl sm:rounded-[1.25rem] transition-all group cursor-pointer overflow-hidden sm:px-4 sm:py-2" 
+              onClick={() => setVaultState({ open: true, tab: 'profile' })}
+            >
               <div className="text-right hidden sm:block">
-                <p className="text-white text-xs sm:text-sm font-black uppercase italic leading-none">{profile.name}</p>
-                <p className="text-indigo-400 text-[8px] sm:text-[10px] font-black uppercase tracking-widest mt-1 opacity-60 group-hover:opacity-100 transition-opacity">Trainer #{profile.trainerId}</p>
+                <p className="text-white text-xs font-black uppercase italic leading-none">{profile.name}</p>
+                <p className="text-indigo-400 text-[9px] font-black uppercase tracking-widest mt-1 opacity-60">ID #{profile.trainerId}</p>
               </div>
-              <HeaderTrainerSprite name={profile.avatar || 'red'} />
+              <div className="w-11 h-11 sm:w-10 sm:h-10 shrink-0">
+                <HeaderTrainerSprite name={profile.avatar || 'red'} />
+              </div>
             </div>
 
+            {/* Vault Button */}
             <button 
               onClick={() => setVaultState({ open: true, tab: 'teams' })}
-              className="order-1 sm:order-2 flex items-center justify-center gap-3 px-4 sm:px-6 py-2.5 sm:py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl sm:rounded-[1.25rem] border border-slate-700 transition-all group shadow-xl"
+              className="h-11 w-11 sm:h-14 sm:w-auto flex items-center justify-center gap-3 sm:px-6 bg-slate-800 hover:bg-slate-700 text-white rounded-xl sm:rounded-[1.25rem] border border-slate-700 transition-all group shadow-xl"
             >
-              <Fingerprint className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
-              <span className="text-[10px] sm:text-xs uppercase italic font-black hidden sm:inline">The Vault</span>
+              <Fingerprint className="w-5 h-5 sm:w-5 sm:h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
+              <span className="text-xs uppercase italic font-black hidden sm:inline">The Vault</span>
+            </button>
+
+            {/* Info Button */}
+            <button 
+              onClick={() => setIsInfoOpen(true)}
+              className="h-11 w-11 sm:h-14 sm:w-14 flex items-center justify-center bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 rounded-xl sm:rounded-[1.25rem] transition-all group shadow-lg shadow-indigo-500/5"
+              title="Application Intel"
+            >
+              <Info className="w-5 h-5 sm:w-6 sm:h-6 group-hover:scale-110 transition-transform" />
             </button>
           </div>
         </div>
@@ -349,7 +367,10 @@ const App: React.FC = () => {
             </div>
             <div className="hidden sm:flex items-center justify-end flex-1 h-full">
               {teamAverages && (
-                <div className="flex items-center gap-2 px-5 py-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-inner animate-in fade-in zoom-in duration-500">
+                <div 
+                  onClick={() => setIsStatsModalOpen(true)}
+                  className="flex items-center gap-2 px-5 py-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-inner animate-in fade-in zoom-in duration-500 cursor-pointer hover:bg-slate-800/80 transition-all active:scale-95"
+                >
                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-3 border-r border-slate-800 pr-3">Avg Stats</span>
                   {teamAverages.map(avg => (
                     <div key={avg.name} className="flex flex-col items-center min-w-[32px]">
@@ -430,15 +451,22 @@ const App: React.FC = () => {
           onRenameTeam={handleRenameTeam}
           onLoadTeam={handleLoadTeam}
           onAddTeam={(t) => setTeams(prev => [t, ...prev])}
+          onClearAllTeams={() => setTeams([])}
           onDeleteBoxPkmn={handleDeleteFromBox}
           onUpdateBoxNickname={handleUpdateBoxNickname}
           onAddToTeamFromBox={handleAddToTeamFromBox}
           onAddBoxPkmn={(p) => setBox(prev => [p, ...prev])}
+          onClearAllBox={() => setBox([])}
           onDeleteEnemyTeam={handleDeleteEnemyTeam}
           onLoadEnemyTeam={handleLoadEnemyTeam}
+          onClearAllEnemyTeams={() => setEnemyTeams([])}
           onExportMasterKey={handleExportMasterKey}
           onImportMasterKey={handleImportMasterKey}
         />
+      )}
+
+      {isInfoOpen && (
+        <InfoModal onClose={() => setIsInfoOpen(false)} />
       )}
       
       {isStatsModalOpen && <TeamStats team={team} onClose={() => setIsStatsModalOpen(false)} />}

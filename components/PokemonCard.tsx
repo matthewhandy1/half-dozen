@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PokemonData, MoveDetails } from '../types';
 import { POKEMON_TYPES, TYPE_COLORS } from '../constants';
-import { Search, X, Edit3, Disc, Check, Settings2, Zap, ShieldCheck } from 'lucide-react';
+import { Search, X, Edit3, Disc, Check, Settings2, Zap, ShieldCheck, Trash2, PackagePlus } from 'lucide-react';
 import { fetchPokemon, fetchMoveDetails } from '../services/pokeApi';
 import { ControlTooltip } from './PokemonSharedUI';
 import { MoveSearchSelector } from './PokemonSelectors';
@@ -139,7 +139,7 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
               <div className="w-full relative z-10 px-2">
                 <input 
                   type="text" 
-                  placeholder="Designate..." 
+                  placeholder="Add Pokemon" 
                   className="w-full px-4 py-4 rounded-2xl bg-slate-950 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-slate-100 font-bold text-xs uppercase text-center italic" 
                   value={searchTerm} 
                   onFocus={() => setIsPkmnOpen(true)} 
@@ -162,7 +162,7 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col relative p-4 sm:p-5 gap-1 h-full cursor-pointer sm:cursor-default items-center" onClick={() => { if(window.innerWidth < 1024) setIsArchitectOpen(true); }}>
+            <div className="flex-1 flex flex-col relative p-4 sm:p-5 gap-1 h-full cursor-pointer sm:cursor-default items-center" onClick={() => { if(window.innerWidth < 1024) { setTempNickname(pokemon.nickname || ''); setIsArchitectOpen(true); } }}>
               
               {/* TOP CONTROLS */}
               <div className="hidden lg:flex absolute top-4 left-4 z-20 gap-2">
@@ -295,8 +295,8 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
             <div className="flex items-center gap-5">
               <img src={pokemon.sprite} className="w-16 h-16 object-contain" />
               <div>
-                <h2 className="text-2xl font-black text-white uppercase italic tracking-tight">{pokemon.name} Matrix</h2>
-                <p className="text-xs text-indigo-400 font-bold uppercase tracking-widest">Tactical Adjustment Terminal</p>
+                <h2 className="text-2xl font-black text-white uppercase italic tracking-tight">{pokemon.name}</h2>
+                {pokemon.nickname && <p className="text-xs text-indigo-400 font-bold uppercase tracking-widest">{pokemon.nickname}</p>}
               </div>
             </div>
             <button onClick={() => setIsArchitectOpen(false)} className="p-3 text-slate-500 hover:text-white"><X className="w-8 h-8" /></button>
@@ -304,11 +304,10 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
           
           <div className="flex-1 overflow-y-auto p-6 space-y-10 max-w-4xl mx-auto w-full">
             <section>
-              <h3 className="text-sm font-black text-slate-500 uppercase tracking-[0.2em] mb-6">Identity Matrix</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Label</label>
-                   <input className="w-full bg-slate-900 border border-slate-800 text-lg font-black text-white p-5 rounded-2xl outline-none uppercase italic" value={tempNickname} onChange={e => { setTempNickname(e.target.value); if(pokemon) onSelect(index, { ...pokemon, nickname: e.target.value }); }} />
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Nickname</label>
+                   <input className="w-full bg-slate-900 border border-slate-800 text-lg font-black text-white p-5 rounded-2xl outline-none uppercase italic" value={tempNickname} placeholder="Designate identity..." onChange={e => { setTempNickname(e.target.value); if(pokemon) onSelect(index, { ...pokemon, nickname: e.target.value }); }} />
                 </div>
                 <div className="space-y-2">
                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Type Modification</label>
@@ -361,9 +360,16 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
             </section>
           </div>
 
-          <div className="p-6 bg-slate-900 border-t border-slate-800 flex gap-6">
-            <button onClick={handleSaveInstance} className={`flex-1 flex items-center justify-center gap-3 py-6 rounded-2xl font-black uppercase text-sm border active:scale-95 transition-all ${saving ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-indigo-600 text-white border-indigo-500'}`}>{saving ? <Check className="w-5 h-5" /> : <Disc className="w-5 h-5" />} Stash Unit</button>
-            <button onClick={() => setIsArchitectOpen(false)} className="flex-1 py-6 bg-slate-800 text-white rounded-2xl font-black uppercase text-sm border border-slate-700">Exit Terminal</button>
+          <div className="p-4 sm:p-6 bg-slate-900 border-t border-slate-800 flex flex-row gap-3 sm:gap-6">
+            <button onClick={handleSaveInstance} className={`flex-1 flex items-center justify-center gap-2 py-4 sm:py-6 rounded-2xl font-black uppercase text-[10px] sm:text-sm border active:scale-95 transition-all ${saving ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-indigo-600 text-white border-indigo-500'}`}>
+              {saving ? <Check className="w-4 h-4 sm:w-5 sm:h-5" /> : <PackagePlus className="w-4 h-4 sm:w-5 sm:h-5" />} Add to Box
+            </button>
+            <button 
+              onClick={() => { onSelect(index, null); setIsArchitectOpen(false); }} 
+              className="flex-1 py-4 sm:py-6 bg-slate-800 hover:bg-red-950/40 text-slate-400 hover:text-red-400 rounded-2xl font-black uppercase text-[10px] sm:text-sm border border-slate-700 flex items-center justify-center gap-2 active:scale-95 transition-all"
+            >
+              <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" /> Remove from Team
+            </button>
           </div>
         </div>
       )}

@@ -3,7 +3,7 @@ import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { PokemonTeam } from '../types';
 import { STAT_ABBREVIATIONS } from '../constants';
-import { X, BarChart3, TrendingUp } from 'lucide-react';
+import { X, BarChart3 } from 'lucide-react';
 
 interface TeamStatsProps {
   team: PokemonTeam;
@@ -75,7 +75,7 @@ export const TeamStats: React.FC<TeamStatsProps> = ({ team, onClose }) => {
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 sm:p-10 scrollbar-thin">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-10">
+          <div className="grid grid-cols-2 gap-4 sm:gap-6 mb-8 sm:mb-10">
             <div className="bg-slate-950/50 border border-slate-800 p-4 sm:p-6 rounded-2xl sm:rounded-3xl">
               <span className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">BST Average</span>
               <span className="text-2xl sm:text-3xl font-black text-white italic">
@@ -86,12 +86,6 @@ export const TeamStats: React.FC<TeamStatsProps> = ({ team, onClose }) => {
               <span className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Strongest Stat</span>
               <span className="text-2xl sm:text-3xl font-black text-emerald-400 italic">
                 {data.length > 0 ? [...data].sort((a, b) => b.value - a.value)[0].name : '—'}
-              </span>
-            </div>
-            <div className="bg-slate-950/50 border border-slate-800 p-4 sm:p-6 rounded-2xl sm:rounded-3xl">
-              <span className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Focus Bias</span>
-              <span className="text-2xl sm:text-3xl font-black text-indigo-400 italic">
-                {data.find(d => d.name === 'SPE')?.value && data.find(d => d.name === 'SPE')!.value > 100 ? 'Hyper Offense' : 'Balanced'}
               </span>
             </div>
           </div>
@@ -128,13 +122,6 @@ export const TeamStats: React.FC<TeamStatsProps> = ({ team, onClose }) => {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-          </div>
-          
-          <div className="mt-6 sm:mt-8 flex items-center justify-center gap-3">
-             <div className="flex items-center gap-2">
-               <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
-               <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">Compared to standard competitive tier benchmarks</span>
-             </div>
           </div>
         </div>
       </div>
