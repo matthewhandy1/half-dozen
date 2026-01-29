@@ -37,9 +37,9 @@ export interface PokemonData {
   nickname?: string;
   sprite: string;
   types: PokemonType[];
-  stats: PokemonStat[];
-  abilities: PokemonAbility[];
-  availableMoves: string[]; 
+  stats: PokemonStat[]; // Can be empty in storage
+  abilities: PokemonAbility[]; // Can be empty in storage
+  availableMoves?: string[]; // Optional in storage to save massive space
   selectedMoves: SelectedMove[]; 
   selectedAbility?: string;
   selectedNature?: string;

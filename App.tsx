@@ -39,6 +39,40 @@ const HeaderTrainerSprite: React.FC<{ name: string }> = ({ name }) => {
   );
 };
 
+// HELPER: Strip fat from Pokemon objects for storage
+const miniaturize = (p: PokemonData | null): PokemonData | null => {
+  if (!p) return null;
+  const { availableMoves, abilities, stats, ...essential } = p;
+  return { 
+    ...essential, 
+    stats: [], // Empty stats for storage
+    abilities: [] // Empty abilities for storage
+  } as PokemonData;
+};
+
+// HELPER: Compression/Decompression
+const compress = async (text: string) => {
+  const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
+  const compressedBlob = await new Response(stream).blob();
+  const reader = new FileReader();
+  return new Promise<string>((resolve) => {
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(',')[1];
+      resolve(`H6_${base64}`); // Header for versioning
+    };
+    reader.readAsDataURL(compressedBlob);
+  });
+};
+
+const decompress = async (encoded: string) => {
+  if (!encoded.startsWith('H6_')) throw new Error("Unsupported format");
+  const base64 = encoded.slice(3);
+  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  const decompressedText = await new Response(stream).text();
+  return JSON.parse(decompressedText);
+};
+
 const App: React.FC = () => {
   const [team, setTeam] = useState<PokemonTeam>([null, null, null, null, null, null]);
   const [enemyTeam, setEnemyTeam] = useState<PokemonTeam>([null, null, null, null, null, null]);
@@ -57,13 +91,7 @@ const App: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile>(() => {
     try {
       const stored = localStorage.getItem('half-dozen-profile');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (typeof parsed.avatarId === 'number') {
-          return { ...parsed, avatar: 'red' };
-        }
-        return parsed;
-      }
+      if (stored) return JSON.parse(stored);
     } catch (e) {}
     return {
       name: "RED",
@@ -115,7 +143,7 @@ const App: React.FC = () => {
              setEnemyTeams([{
                id: 'trainer-red-classic',
                name: "Trainer Red",
-               pokemon: JSON.parse(JSON.stringify(redTeamData)),
+               pokemon: redTeamData.map(p => miniaturize(p)),
                timestamp: Date.now()
              }]);
           }
@@ -124,6 +152,18 @@ const App: React.FC = () => {
     };
     init();
   }, []);
+
+  // Hydrate pokemon data when it is loaded into the active slots
+  const hydrateSlot = async (index: number, partialData: PokemonData) => {
+    try {
+      const full = await fetchPokemon(partialData.id);
+      setTeam(prev => {
+        const next = [...prev];
+        next[index] = { ...full, ...partialData, stats: full.stats, abilities: full.abilities, availableMoves: full.availableMoves };
+        return next;
+      });
+    } catch (e) { console.error("Hydration Error:", e); }
+  };
 
   useEffect(() => localStorage.setItem('half-dozen-box', JSON.stringify(box)), [box]);
   useEffect(() => localStorage.setItem('half-dozen-teams', JSON.stringify(teams)), [teams]);
@@ -144,9 +184,9 @@ const App: React.FC = () => {
 
   const handleSaveToBox = (pokemon: PokemonData) => {
     const newEntry: BoxPokemon = {
-      ...JSON.parse(JSON.stringify(pokemon)), 
+      ...miniaturize(pokemon), 
       instanceId: Date.now().toString() + Math.random().toString(36).substr(2, 9)
-    };
+    } as BoxPokemon;
     setBox(prev => [newEntry, ...prev]);
   };
 
@@ -155,9 +195,9 @@ const App: React.FC = () => {
     if (activePokemon.length === 0) return;
 
     const newEntries: BoxPokemon[] = activePokemon.map(p => ({
-      ...JSON.parse(JSON.stringify(p)),
+      ...miniaturize(p),
       instanceId: Date.now().toString() + Math.random().toString(36).substr(2, 9)
-    }));
+    } as BoxPokemon));
 
     setBox(prev => [...newEntries, ...prev]);
     setShowBulkStashFeedback(true);
@@ -169,14 +209,20 @@ const App: React.FC = () => {
   };
 
   const handleDeleteFromBox = (id: string) => setBox(prev => prev.filter(p => p.instanceId !== id));
+  
   const handleAddToTeamFromBox = (pokemon: BoxPokemon, slotIndex: number) => {
     const newTeam = [...team];
     newTeam[slotIndex] = JSON.parse(JSON.stringify(pokemon));
     setTeam(newTeam);
+    hydrateSlot(slotIndex, pokemon); // Re-fetch the fat data (stats, moves)
   };
 
   const handleLoadTeam = (loadedTeam: PokemonTeam) => {
-    setTeam(JSON.parse(JSON.stringify(loadedTeam)));
+    const nextTeam = JSON.parse(JSON.stringify(loadedTeam));
+    setTeam(nextTeam);
+    nextTeam.forEach((p: PokemonData | null, idx: number) => {
+      if (p) hydrateSlot(idx, p);
+    });
   };
 
   const handleLoadEnemyTeam = (loadedTeam: PokemonTeam) => {
@@ -200,10 +246,11 @@ const App: React.FC = () => {
 
   const handleConfirmSaveTeam = () => {
     try {
+      const miniTeam = team.map(p => miniaturize(p));
       const newTeamEntry: SavedTeam = {
         id: Date.now().toString(),
         name: teamNameToSave || "Unnamed Team",
-        pokemon: JSON.parse(JSON.stringify(team)),
+        pokemon: miniTeam,
         timestamp: Date.now()
       };
       setTeams(prev => [newTeamEntry, ...prev]);
@@ -215,10 +262,11 @@ const App: React.FC = () => {
 
   const handleSaveEnemyTeam = (name: string) => {
     if (!enemyTeam.some(p => p !== null)) return;
+    const miniEnemyTeam = enemyTeam.map(p => miniaturize(p as PokemonData));
     const newEntry: SavedEnemyTeam = {
       id: Date.now().toString(),
       name: name || `Rival Team ${new Date().toLocaleDateString()}`,
-      pokemon: JSON.parse(JSON.stringify(enemyTeam)),
+      pokemon: miniEnemyTeam,
       timestamp: Date.now()
     };
     setEnemyTeams(prev => [newEntry, ...prev]);
@@ -230,35 +278,42 @@ const App: React.FC = () => {
     setTeams(prev => prev.map(t => t.id === id ? { ...t, name: newName } : t));
   };
 
-  const handleExportMasterKey = () => {
-    const pkg: MasterSyncPackage = { profile, team, box, teams, enemyTeams, version: "6.0" };
+  const handleExportMasterKey = async () => {
+    const pkg: MasterSyncPackage = { 
+      profile, 
+      team: team.map(p => miniaturize(p)), 
+      box: box.map(p => miniaturize(p) as BoxPokemon), 
+      teams, 
+      enemyTeams, 
+      version: "6.1" 
+    };
     const jsonStr = JSON.stringify(pkg);
-    return btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (match, p1) => 
-      String.fromCharCode(parseInt(p1, 16))
-    ));
+    return await compress(jsonStr);
   };
 
-  const handleImportMasterKey = (key: string) => {
+  const handleImportMasterKey = async (key: string) => {
     try {
-      const jsonStr = decodeURIComponent(Array.prototype.map.call(atob(key), (c) => 
-        '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-      ).join(''));
-      const decoded: MasterSyncPackage = JSON.parse(jsonStr);
+      const decoded: MasterSyncPackage = await decompress(key);
       if (decoded.profile) setProfile(decoded.profile);
       if (decoded.team) setTeam(decoded.team);
       if (decoded.box) setBox(decoded.box);
       if (decoded.teams) setTeams(decoded.teams);
       if (decoded.enemyTeams) setEnemyTeams(decoded.enemyTeams);
+      
+      // Auto-hydrate the current team slots
+      decoded.team.forEach((p, idx) => {
+        if (p) hydrateSlot(idx, p);
+      });
     } catch (e) { 
       console.error("Master Key Import Error:", e);
-      throw new Error("Invalid sync package"); 
+      throw new Error("Invalid sync package or format version"); 
     }
   };
 
   const isTeamEmpty = !team.some(p => p !== null);
 
   const teamAverages = useMemo(() => {
-    const active = team.filter((p): p is NonNullable<typeof p> => p !== null);
+    const active = team.filter((p): p is NonNullable<typeof p> => p !== null && p.stats && p.stats.length > 0);
     if (active.length === 0) return null;
     const sums: Record<string, number> = { hp: 0, attack: 0, defense: 0, 'special-attack': 0, 'special-defense': 0, speed: 0 };
     active.forEach(p => p.stats.forEach(s => { if (sums[s.name] !== undefined) sums[s.name] += s.value; }));
