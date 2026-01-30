@@ -33,6 +33,27 @@ export const OffensiveMatrix: React.FC<OffensiveMatrixProps> = ({ team }) => {
     return { type, strength, resisted, score: strength - resisted };
   });
 
+  const getScoreStyles = (score: number) => {
+    // Scaling color intensity for positive scores (Coverage)
+    if (score >= 5) return "bg-emerald-500 text-white border-emerald-200 shadow-[0_0_25px_rgba(16,185,129,0.8)] scale-110 z-20 font-black";
+    if (score >= 3) return "bg-emerald-600 text-white border-emerald-400 shadow-[0_0_15px_rgba(5,150,105,0.6)] z-20";
+    if (score >= 1) return "bg-emerald-900/80 text-emerald-200 border-emerald-800/50";
+    
+    // Scaling color intensity for negative scores (Poor Coverage)
+    if (score <= -5) return "bg-red-500 text-white border-red-200 shadow-[0_0_25px_rgba(239,68,68,0.8)] scale-110 z-20 font-black";
+    if (score <= -3) return "bg-red-600 text-white border-red-400 shadow-[0_0_15px_rgba(220,38,38,0.6)] z-20";
+    if (score <= -1) return "bg-red-900/80 text-red-200 border-red-800/50";
+
+    return "bg-slate-950 text-slate-700 border-slate-800";
+  };
+
+  const getBadgeStyles = (m: number) => {
+     if (m >= 2) return "bg-emerald-500 text-white border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.4)] z-10";
+     if (m === 0) return "bg-indigo-600 text-white border-indigo-400 shadow-[0_0_10px_rgba(79,70,229,0.3)]";
+     if (m > 0 && m < 1) return "bg-red-900 text-red-100 border-red-700/50";
+     return "";
+  };
+
   return (
     <div className="bg-slate-900 rounded-2xl sm:rounded-[2.5rem] p-3 sm:p-8 shadow-2xl border border-slate-800 w-full overflow-hidden">
       <h2 className="text-lg sm:text-2xl font-black text-slate-100 mb-4 sm:mb-6 px-1 uppercase italic tracking-tight flex items-center gap-2">
@@ -76,27 +97,21 @@ export const OffensiveMatrix: React.FC<OffensiveMatrixProps> = ({ team }) => {
                     
                     let badge = null;
                     if (m >= 2) {
-                      badge = <div className="w-full py-1 sm:py-1.5 rounded sm:rounded-lg text-[8px] sm:text-[11px] font-black border sm:border-2 bg-emerald-950/60 text-emerald-400 border-emerald-700">SE</div>;
+                      badge = <div className={`w-full py-1 sm:py-1.5 rounded sm:rounded-lg text-[8px] sm:text-[11px] font-black border sm:border-2 transition-all ${getBadgeStyles(m)}`}>SE</div>;
                     } else if (m === 0) {
-                      badge = <div className="w-full py-1 sm:py-1.5 rounded sm:rounded-lg text-[8px] sm:text-[11px] font-black border sm:border-2 bg-indigo-950/60 text-indigo-400 border-indigo-900/50">IM</div>;
+                      badge = <div className={`w-full py-1 sm:py-1.5 rounded sm:rounded-lg text-[8px] sm:text-[11px] font-black border sm:border-2 transition-all ${getBadgeStyles(m)}`}>IM</div>;
                     } else if (m > 0 && m < 1) {
-                      badge = <div className="w-full py-1 sm:py-1.5 rounded sm:rounded-lg text-[8px] sm:text-[11px] font-black border sm:border-2 bg-red-950/60 text-red-400 border-red-900/50">RS</div>;
+                      badge = <div className={`w-full py-1 sm:py-1.5 rounded sm:rounded-lg text-[8px] sm:text-[11px] font-black border sm:border-2 transition-all ${getBadgeStyles(m)}`}>RS</div>;
                     }
 
                     return (
-                      <td key={i} className="p-0.5 sm:p-1 border border-slate-800 text-center bg-slate-900/40">
+                      <td key={i} className="p-0.5 sm:p-1 border border-slate-800 text-center bg-slate-900/40 relative">
                         {badge}
                       </td>
                     );
                   })}
                   <td className="p-0.5 sm:p-1 border border-slate-800 bg-slate-900">
-                    <div className={`w-full py-1 sm:py-1.5 rounded sm:rounded-lg text-[8px] sm:text-xs font-black text-center border sm:border-2 ${
-                      rowCoverage.score > 0 
-                        ? 'bg-emerald-950/60 text-emerald-400 border-emerald-900/50' 
-                        : rowCoverage.score < 0 
-                          ? 'bg-red-950/60 text-red-400 border-red-900/50' 
-                          : 'bg-slate-950 text-slate-600 border-slate-800'
-                    }`}>
+                    <div className={`w-full py-1 sm:py-1.5 rounded sm:rounded-lg text-[8px] sm:text-xs font-black text-center border sm:border-2 transition-all duration-300 ${getScoreStyles(rowCoverage.score)}`}>
                       {rowCoverage.score > 0 ? `+${rowCoverage.score}` : rowCoverage.score === 0 ? '-' : rowCoverage.score}
                     </div>
                   </td>

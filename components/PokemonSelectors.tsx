@@ -87,7 +87,7 @@ export const MoveSearchSelector = React.memo(({
   const typeColor = TYPE_COLORS[selectedMove.type] || '';
 
   return (
-    <div className={`relative w-full flex items-center gap-2 ${isOpen ? 'z-[100]' : 'z-auto'}`} ref={dropdownRef} onClick={e => e.stopPropagation()}>
+    <div className={`relative w-full flex items-center gap-2 ${isOpen ? 'z-[100]' : 'z-0 hover:z-[50]'}`} ref={dropdownRef} onClick={e => e.stopPropagation()}>
       <div 
         className="relative flex-1" 
         onMouseEnter={handleFetchAndShow} 

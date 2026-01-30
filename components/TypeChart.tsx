@@ -66,6 +66,30 @@ export const TypeChart: React.FC<TypeChartProps> = ({ team }) => {
     return { type, weak, resist, score: weak - resist };
   });
 
+  const getCellStyles = (multiplier: number) => {
+    if (multiplier === 1) return "";
+    if (multiplier >= 4) return "bg-red-500 text-white border-red-300 shadow-[0_0_15px_rgba(239,68,68,0.5)] z-10";
+    if (multiplier >= 2) return "bg-red-900 text-red-100 border-red-700/50";
+    if (multiplier === 0) return "bg-indigo-600 text-white border-indigo-300 shadow-[0_0_12px_rgba(79,70,229,0.4)] z-10";
+    if (multiplier <= 0.25) return "bg-emerald-500 text-white border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.5)] z-10";
+    if (multiplier <= 0.5) return "bg-emerald-900 text-emerald-100 border-emerald-700/50";
+    return "bg-slate-800 text-slate-400 border-slate-700";
+  };
+
+  const getScoreStyles = (score: number) => {
+    // Scaling color intensity for positive scores (Weaknesses)
+    if (score >= 5) return "bg-red-500 text-white border-red-200 shadow-[0_0_25px_rgba(239,68,68,0.8)] scale-110 z-20 font-black";
+    if (score >= 3) return "bg-red-600 text-white border-red-400 shadow-[0_0_15px_rgba(220,38,38,0.6)] z-20";
+    if (score >= 1) return "bg-red-900/80 text-red-200 border-red-800/50";
+    
+    // Scaling color intensity for negative scores (Resistances)
+    if (score <= -5) return "bg-emerald-500 text-white border-emerald-200 shadow-[0_0_25px_rgba(16,185,129,0.8)] scale-110 z-20 font-black";
+    if (score <= -3) return "bg-emerald-600 text-white border-emerald-400 shadow-[0_0_15px_rgba(5,150,105,0.6)] z-20";
+    if (score <= -1) return "bg-emerald-900/80 text-emerald-200 border-emerald-800/50";
+    
+    return "bg-slate-950 text-slate-700 border-slate-800";
+  };
+
   return (
     <div className="bg-slate-900 rounded-2xl sm:rounded-[2.5rem] p-3 sm:p-8 shadow-2xl border border-slate-800 w-full overflow-hidden">
       <div className="flex items-center justify-between mb-4 sm:mb-6 px-1">
@@ -112,13 +136,7 @@ export const TypeChart: React.FC<TypeChartProps> = ({ team }) => {
                     return (
                       <td key={i} className="p-0.5 sm:p-1 border border-slate-800 text-center bg-slate-900/40 relative">
                         {multiplier !== 1 && (
-                          <div className={`w-full py-1 sm:py-1.5 rounded sm:rounded-lg text-[8px] sm:text-[11px] font-black border sm:border-2 transition-all ${
-                            multiplier > 1 
-                              ? 'bg-red-950/60 text-red-400 border-red-900/50' 
-                              : multiplier === 0 
-                                ? 'bg-indigo-950/80 text-indigo-400 border-indigo-500/50' 
-                                : 'bg-emerald-950/60 text-emerald-400 border-emerald-900/50'
-                          }`}>
+                          <div className={`w-full py-1 sm:py-1.5 rounded sm:rounded-lg text-[8px] sm:text-[11px] font-black border sm:border-2 transition-all ${getCellStyles(multiplier)}`}>
                             {multiplier === 0 ? '0' : multiplier === 0.25 ? '¼' : multiplier === 0.5 ? '½' : multiplier}
                           </div>
                         )}
@@ -126,13 +144,7 @@ export const TypeChart: React.FC<TypeChartProps> = ({ team }) => {
                     );
                   })}
                   <td className="p-0.5 sm:p-1 border border-slate-800 bg-slate-900">
-                    <div className={`w-full py-1 sm:py-1.5 rounded sm:rounded-lg text-[8px] sm:text-xs font-black text-center border sm:border-2 ${
-                      rowTotal.score > 0 
-                        ? 'bg-red-950/60 text-red-400 border-red-900/50' 
-                        : rowTotal.score < 0 
-                          ? 'bg-emerald-950/60 text-emerald-400 border-emerald-900/50' 
-                          : 'bg-slate-950 text-slate-600 border-slate-800'
-                    }`}>
+                    <div className={`w-full py-1 sm:py-1.5 rounded sm:rounded-lg text-[8px] sm:text-xs font-black text-center border sm:border-2 transition-all duration-300 ${getScoreStyles(rowTotal.score)}`}>
                       {rowTotal.score > 0 ? `+${rowTotal.score}` : rowTotal.score === 0 ? '-' : rowTotal.score}
                     </div>
                   </td>

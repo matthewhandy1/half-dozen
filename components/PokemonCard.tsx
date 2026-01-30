@@ -126,7 +126,6 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
     INFLUENTIAL_ABILITIES.includes(a.name.toLowerCase())
   ) || [];
 
-  // Extract moves pool to a stable constant to avoid TS narrowing issues inside map loops
   const movesPool = pokemon?.availableMoves ?? [];
 
   return (
@@ -165,9 +164,8 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col relative p-4 sm:p-5 gap-1 h-full cursor-pointer sm:cursor-default items-center" onClick={() => { if(window.innerWidth < 1024) { setTempNickname(pokemon.nickname || ''); setIsArchitectOpen(true); } }}>
+            <div className="flex-1 flex flex-col relative p-4 sm:p-5 gap-1 h-full cursor-pointer lg:cursor-default items-center" onClick={() => { if(window.innerWidth < 1024) { setTempNickname(pokemon.nickname || ''); setIsArchitectOpen(true); } }}>
               
-              {/* TOP CONTROLS */}
               <div className="hidden lg:flex absolute top-4 left-4 z-20 gap-2">
                 <div className="relative group">
                   <button onClick={(e) => { e.stopPropagation(); setTempNickname(pokemon.nickname || pokemon.name); setIsEditing(!isEditing); }} className={`p-2 rounded-xl transition-all active:scale-95 ${isEditing ? 'text-indigo-400 bg-indigo-500/10' : 'bg-slate-800/60 hover:bg-indigo-600/30 text-slate-400'}`}>
@@ -190,7 +188,6 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
                 </div>
               </div>
 
-              {/* Header Info (Sprite & Name) */}
               <div className="flex flex-col items-center shrink-0 w-full relative">
                 <div className={`relative w-16 h-16 sm:w-18 sm:h-18 lg:w-20 lg:h-20 transition-transform duration-500 ${saving ? 'animate-bounce' : ''} flex items-center justify-center`}>
                   <img src={pokemon.sprite} alt={pokemon.name} className="w-full h-full relative object-contain drop-shadow-2xl" />
@@ -239,7 +236,6 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
                 )}
               </div>
 
-              {/* Main Content (Moveset) */}
               <div className="flex-1 flex flex-col w-full mt-2 justify-start pb-1">
                 {isEditing ? (
                   <div className="flex flex-col gap-2 animate-in slide-in-from-top-1 duration-200 px-1" onClick={e => e.stopPropagation()}>
@@ -267,11 +263,12 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
                     <button onClick={() => { handleSaveNickname(); setIsEditing(false); }} className="w-full py-2.5 bg-indigo-600 text-white text-[9px] font-black uppercase italic rounded-xl shadow-md">Confirm</button>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-1 pt-3 border-t border-slate-800/40">
-                    <div className="flex justify-center mb-0.5">
-                      <p className="text-[7px] sm:text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Offensive Coverage</p>
-                    </div>
-                    <div className="grid grid-cols-1 gap-1">
+                  <div className="flex flex-col gap-1 pt-3 border-t border-slate-800/40 w-full">
+                    {/* Desktop View: Full Selectors */}
+                    <div className="hidden lg:grid grid-cols-1 gap-1">
+                      <div className="flex justify-center mb-0.5">
+                        <p className="text-[7px] sm:text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Offensive Coverage</p>
+                      </div>
                       {[0, 1, 2, 3].map(i => (
                         <MoveSearchSelector 
                           key={i} 
@@ -283,6 +280,23 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
                           openUpwards={i > 1}
                         />
                       ))}
+                    </div>
+                    
+                    {/* Mobile/Small View: Move Type Summary */}
+                    <div className="lg:hidden flex flex-col items-center gap-1 w-full animate-in fade-in duration-300">
+                      <p className="text-[7px] font-black text-slate-600 uppercase tracking-widest mb-1">Moveset Signature</p>
+                      <div className="flex flex-wrap justify-center gap-1 px-1">
+                        {pokemon.selectedMoves.map((m, i) => (
+                          m.name ? (
+                            <div key={i} className="w-8 h-3.5 rounded-sm border border-white/5 shadow-sm flex items-center justify-center" style={{ backgroundColor: TYPE_COLORS[m.type] || '#444' }}>
+                               <span className="text-[6px] text-white font-black uppercase truncate px-0.5">{m.type.substring(0, 3)}</span>
+                            </div>
+                          ) : (
+                            <div key={i} className="w-8 h-3.5 rounded-sm bg-slate-800/40 border border-slate-800/60 border-dashed" />
+                          )
+                        ))}
+                      </div>
+                      <p className="text-[6px] text-slate-500 font-bold uppercase mt-2 opacity-50 italic">Tap to Configure</p>
                     </div>
                   </div>
                 )}
