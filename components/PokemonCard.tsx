@@ -15,6 +15,7 @@ interface PokemonCardProps {
   pokemonList: { name: string; id: number }[];
   allMovesList: string[];
   allItemsList: string[];
+  generation: number;
 }
 
 const INFLUENTIAL_ABILITIES = [
@@ -23,7 +24,9 @@ const INFLUENTIAL_ABILITIES = [
   'well-baked-body', 'wind-rider', 'purifying-salt', 'heatproof'
 ];
 
-export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSelect, onSaveToBox, pokemonList, allMovesList }) => {
+export const PokemonCard: React.FC<PokemonCardProps> = ({ 
+  index, pokemon, onSelect, onSaveToBox, pokemonList, allMovesList, generation 
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isPkmnOpen, setIsPkmnOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -33,6 +36,9 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
   const [tempNickname, setTempNickname] = useState('');
   
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const supportsAbilities = generation >= 3;
+  const supportsItems = generation >= 2;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -78,7 +84,7 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
   };
 
   const handleToggleAbility = (abilityName: string) => {
-    if (!pokemon) return;
+    if (!pokemon || !supportsAbilities) return;
     const isCurrentlySelected = pokemon.selectedAbility === abilityName;
     onSelect(index, { ...pokemon, selectedAbility: isCurrentlySelected ? '' : abilityName });
   };
@@ -203,7 +209,7 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
                         {(pokemon.customTypes || pokemon.types.map(t => t.name)).map((tName, i) => (
                           <span 
                             key={i} 
-                            className="inline-flex items-center justify-center w-11 sm:w-12 h-3.5 sm:h-4 rounded-md text-[7px] sm:text-[8px] font-black uppercase tracking-widest text-white ring-1 ring-inset ring-white/10 shadow-sm" 
+                            className="inline-flex items-center justify-center w-14 sm:w-16 h-4 sm:h-5 rounded-md text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-white ring-1 ring-inset ring-white/10 shadow-sm" 
                             style={{ 
                                 backgroundColor: TYPE_COLORS[tName] || '#777',
                                 backgroundImage: 'linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1))'
@@ -215,7 +221,7 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
                       </div>
 
                       <div className="absolute right-0 flex gap-0.5 items-center">
-                        {influentialAbilities.map(ability => (
+                        {supportsAbilities && influentialAbilities.map(ability => (
                           <div className="relative group" key={ability.name}>
                             <button
                               onClick={(e) => { e.stopPropagation(); handleToggleAbility(ability.name); }}
@@ -340,7 +346,7 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
               </div>
             </section>
 
-            {influentialAbilities.length > 0 && (
+            {supportsAbilities && influentialAbilities.length > 0 && (
               <section>
                 <h3 className="text-sm font-black text-slate-500 uppercase tracking-[0.2em] mb-6">Passive Modifiers</h3>
                 <div className="flex flex-wrap gap-4">

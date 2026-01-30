@@ -35,7 +35,20 @@ export const SPECIES_COLORS: Record<string, string> = {
 
 export const POKEMON_TYPES = Object.keys(TYPE_COLORS);
 
-export const TYPE_CHART: Record<string, Record<string, number>> = {
+export const GENERATIONS = [
+  { id: 1, name: 'Gen 1', region: 'Kanto', limit: 151 },
+  { id: 2, name: 'Gen 2', region: 'Johto', limit: 251 },
+  { id: 3, name: 'Gen 3', region: 'Hoenn', limit: 386 },
+  { id: 4, name: 'Gen 4', region: 'Sinnoh', limit: 493 },
+  { id: 5, name: 'Gen 5', region: 'Unova', limit: 649 },
+  { id: 6, name: 'Gen 6', region: 'Kalos', limit: 721 },
+  { id: 7, name: 'Gen 7', region: 'Alola', limit: 809 },
+  { id: 8, name: 'Gen 8', region: 'Galar', limit: 898 },
+  { id: 9, name: 'Gen 9', region: 'Paldea', limit: 1025 },
+];
+
+// Modern Chart (Gen 6+)
+const MODERN_CHART: Record<string, Record<string, number>> = {
   normal: { rock: 0.5, ghost: 0, steel: 0.5 },
   fire: { fire: 0.5, water: 0.5, grass: 2, ice: 2, bug: 2, rock: 0.5, dragon: 0.5, steel: 2 },
   water: { fire: 2, water: 0.5, grass: 0.5, ground: 2, rock: 2, dragon: 0.5 },
@@ -55,6 +68,52 @@ export const TYPE_CHART: Record<string, Record<string, number>> = {
   steel: { fire: 0.5, water: 0.5, electric: 0.5, ice: 2, rock: 2, steel: 0.5, fairy: 2 },
   fairy: { fire: 0.5, fighting: 2, poison: 0.5, dragon: 2, dark: 2, steel: 0.5 },
 };
+
+// Gen 2-5 Chart (Pre-Fairy)
+const GEN2_5_CHART: Record<string, Record<string, number>> = {
+  ...MODERN_CHART,
+  ghost: { ...MODERN_CHART.ghost, steel: 0.5 }, // Steel resisted Ghost/Dark before Gen 6
+  dark: { ...MODERN_CHART.dark, steel: 0.5 },
+};
+// Remove Fairy matchups
+Object.keys(GEN2_5_CHART).forEach(k => {
+  const { fairy, ...rest } = GEN2_5_CHART[k];
+  GEN2_5_CHART[k] = rest;
+});
+
+// Gen 1 Chart (No Steel/Dark/Fairy + Quirks)
+const GEN1_CHART: Record<string, Record<string, number>> = {
+  normal: { rock: 0.5, ghost: 0 },
+  fire: { fire: 0.5, water: 0.5, grass: 2, ice: 2, bug: 2, rock: 0.5, dragon: 0.5 },
+  water: { fire: 2, water: 0.5, grass: 0.5, ground: 2, rock: 2, dragon: 0.5 },
+  electric: { water: 2, electric: 0.5, grass: 0.5, ground: 0, flying: 2, dragon: 0.5 },
+  grass: { fire: 0.5, water: 2, grass: 0.5, poison: 0.5, ground: 2, flying: 0.5, bug: 0.5, rock: 2, dragon: 0.5 },
+  ice: { water: 0.5, grass: 2, ice: 0.5, ground: 2, flying: 2, dragon: 2, fire: 1 }, // Ice was 1x against Fire in Gen 1
+  fighting: { normal: 2, ice: 2, poison: 0.5, flying: 0.5, psychic: 0.5, bug: 0.5, rock: 2, ghost: 0 },
+  poison: { grass: 2, poison: 0.5, ground: 0.5, rock: 0.5, ghost: 0.5, bug: 2 }, // Poison SE against Bug in Gen 1
+  ground: { fire: 2, electric: 2, grass: 0.5, poison: 2, flying: 0, bug: 0.5, rock: 2 },
+  flying: { electric: 0.5, grass: 2, fighting: 2, bug: 2, rock: 0.5 },
+  psychic: { fighting: 2, poison: 2, psychic: 0.5, ghost: 0 }, // Psychic immune to Ghost in Gen 1 (bug)
+  bug: { fire: 0.5, grass: 2, fighting: 0.5, poison: 2, flying: 0.5, psychic: 2, ghost: 0.5 }, // Bug SE against Poison in Gen 1
+  rock: { fire: 2, ice: 2, fighting: 0.5, ground: 0.5, flying: 2, bug: 2 },
+  ghost: { normal: 0, psychic: 0, ghost: 2 }, // Ghost had NO effect on Psychic in Gen 1 (bug)
+  dragon: { dragon: 2 },
+};
+
+export const getChartForGen = (genId: number) => {
+  if (genId === 1) return GEN1_CHART;
+  if (genId <= 5) return GEN2_5_CHART;
+  return MODERN_CHART;
+};
+
+export const getTypesForGen = (genId: number) => {
+  const types = [...POKEMON_TYPES];
+  if (genId === 1) return types.filter(t => t !== 'dark' && t !== 'steel' && t !== 'fairy');
+  if (genId <= 5) return types.filter(t => t !== 'fairy');
+  return types;
+};
+
+export const TYPE_CHART = MODERN_CHART; // Default fallback
 
 export const STAT_ABBREVIATIONS: Record<string, string> = {
   hp: 'HP',

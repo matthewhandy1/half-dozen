@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { PokemonTeam, PokemonData } from '../types';
-import { TYPE_COLORS, TYPE_CHART } from '../constants';
+import { getChartForGen, getTypesForGen, TYPE_COLORS } from '../constants';
 import { Search, X, ShieldAlert, Loader2, Save, FolderOpen, Sword, Check, AlertCircle, Trash2 } from 'lucide-react';
 import { fetchPokemonBasic } from '../services/pokeApi';
 
@@ -14,6 +14,7 @@ interface EnemyTeamSectionProps {
   onClearEnemyTeam: () => void;
   onOpenLoadEnemyTeams: () => void;
   isSaved?: boolean;
+  generation: number;
 }
 
 export const EnemyTeamSection: React.FC<EnemyTeamSectionProps> = ({ 
@@ -24,7 +25,8 @@ export const EnemyTeamSection: React.FC<EnemyTeamSectionProps> = ({
   onSaveEnemyTeam, 
   onClearEnemyTeam,
   onOpenLoadEnemyTeams, 
-  isSaved 
+  isSaved,
+  generation
 }) => {
   const [isNaming, setIsNaming] = useState(false);
   const [tempName, setTempName] = useState('');
@@ -122,7 +124,7 @@ export const EnemyTeamSection: React.FC<EnemyTeamSectionProps> = ({
         ))}
       </div>
 
-      <RivalMatchupMatrix userTeam={userTeam} enemyTeam={enemyTeam} />
+      <RivalMatchupMatrix userTeam={userTeam} enemyTeam={enemyTeam} generation={generation} />
     </section>
   );
 };
@@ -200,14 +202,21 @@ const EnemyPokemonSelector: React.FC<{
   );
 };
 
-const RivalMatchupMatrix: React.FC<{ userTeam: PokemonTeam, enemyTeam: PokemonTeam }> = ({ userTeam, enemyTeam }) => {
+const RivalMatchupMatrix: React.FC<{ userTeam: PokemonTeam, enemyTeam: PokemonTeam, generation: number }> = ({ userTeam, enemyTeam, generation }) => {
+  const chart = getChartForGen(generation);
+  const relevantTypes = getTypesForGen(generation);
+
   const getBestUserEffectiveness = (userPkmn: NonNullable<PokemonTeam[0]>, enemyPkmn: NonNullable<PokemonTeam[0]>) => {
     const enemyTypes = enemyPkmn.customTypes ? enemyPkmn.customTypes.filter(t => t !== 'none') : enemyPkmn.types.map(t => t.name);
     let maxMultiplier = 0;
     userPkmn.selectedMoves.forEach(move => {
       if (!move.name || move.damageClass === 'status') return;
       let moveMult = 1;
-      enemyTypes.forEach(eType => { moveMult *= (TYPE_CHART[move.type]?.[eType] ?? 1); });
+      enemyTypes.forEach(eType => { 
+        if (relevantTypes.includes(eType)) {
+          moveMult *= (chart[move.type]?.[eType] ?? 1); 
+        }
+      });
       if (moveMult > maxMultiplier) maxMultiplier = moveMult;
     });
     return maxMultiplier;
@@ -238,11 +247,8 @@ const RivalMatchupMatrix: React.FC<{ userTeam: PokemonTeam, enemyTeam: PokemonTe
             {activeUser.map((userPkmn, i) => (
               <tr key={i}>
                 <td className="p-1 border border-slate-800 bg-slate-900">
-                   <div className="flex flex-col items-center">
+                   <div className="flex flex-col items-center justify-center">
                      <img src={userPkmn.sprite} className="w-6 h-6 sm:w-8 sm:h-8 object-contain" />
-                     <span className="text-[6px] sm:text-[8px] font-black text-slate-500 uppercase mt-0.5 truncate max-w-full text-center">
-                       {userPkmn.nickname?.substring(0, 5) || userPkmn.name.substring(0, 5)}
-                     </span>
                    </div>
                 </td>
                 {activeEnemy.map((enemyPkmn, j) => {

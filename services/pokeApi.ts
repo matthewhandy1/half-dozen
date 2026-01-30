@@ -1,6 +1,6 @@
 
 import { PokemonData, MoveDetails, SelectedMove, PokemonAbility } from '../types';
-import { TYPE_COLORS, SPECIES_COLORS } from '../constants';
+import { TYPE_COLORS, SPECIES_COLORS, GENERATIONS } from '../constants';
 
 /**
  * Extracts dominant colors from an image URL using a hidden canvas.
@@ -165,13 +165,17 @@ export async function fetchPokemonBasic(identifier: string | number): Promise<Po
   };
 }
 
-export async function fetchAllPokemonNames(): Promise<{ name: string; id: number }[]> {
-  const response = await fetch('https://pokeapi.co/api/v2/pokemon?limit=1500');
+export async function fetchAllPokemonNames(genId: number = 9): Promise<{ name: string; id: number }[]> {
+  const gen = GENERATIONS.find(g => g.id === genId);
+  const limit = gen ? gen.limit : 1025;
+  
+  // We fetch a larger pool and filter locally to ensure we have variety if using standard Pokédex ordering
+  const response = await fetch(`https://pokeapi.co/api/v2/pokemon?limit=${limit}`);
   const data = await response.json();
   return data.results.map((r: any) => ({
     name: r.name.split('-').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
     id: parseInt(r.url.split('/').filter(Boolean).pop() || '0'), 
-  }));
+  })).filter((p: any) => p.id <= limit);
 }
 
 export async function fetchAllMoves(): Promise<string[]> {

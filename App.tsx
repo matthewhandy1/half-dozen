@@ -9,8 +9,10 @@ import { InfoModal } from './components/InfoModal';
 import { EnemyTeamSection } from './components/EnemyTeamSection';
 import { PokemonData, PokemonTeam, BoxPokemon, SavedTeam, SavedEnemyTeam, UserProfile, MasterSyncPackage } from './types';
 import { fetchAllPokemonNames, fetchPokemon, fetchAllMoves, fetchAllItems, fetchPokemonBasic } from './services/pokeApi';
-import { STAT_ABBREVIATIONS } from './constants';
-import { Trash2, Save, Check, BarChart3, LayoutGrid, Fingerprint, PackagePlus, X, User, Loader2, Info } from 'lucide-react';
+import { STAT_ABBREVIATIONS, GENERATIONS } from './constants';
+import { Trash2, Save, Check, BarChart3, LayoutGrid, Fingerprint, PackagePlus, X, User, Loader2, Info, Heart, Layers } from 'lucide-react';
+
+const APP_VERSION = "6.1.2";
 
 const PokeballIcon: React.FC<{ className?: string }> = ({ className }) => (
   <div className={`relative w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 border-slate-950 overflow-hidden shadow-sm ${className}`}>
@@ -79,6 +81,7 @@ const App: React.FC = () => {
   const [pokemonList, setPokemonList] = useState<{ name: string; id: number }[]>([]);
   const [allMovesList, setAllMovesList] = useState<string[]>([]);
   const [allItemsList, setAllItemsList] = useState<string[]>([]);
+  const [selectedGen, setSelectedGen] = useState(9);
   const [showSavedFeedback, setShowSavedFeedback] = useState(false);
   const [showBulkStashFeedback, setShowBulkStashFeedback] = useState(false);
   const [isNamingTeam, setIsNamingTeam] = useState(false);
@@ -126,7 +129,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const init = async () => {
       const [pList, mList, iList] = await Promise.all([
-        fetchAllPokemonNames(),
+        fetchAllPokemonNames(selectedGen),
         fetchAllMoves(),
         fetchAllItems()
       ]);
@@ -151,7 +154,7 @@ const App: React.FC = () => {
       } catch (err) {}
     };
     init();
-  }, []);
+  }, [selectedGen]);
 
   // Hydrate pokemon data when it is loaded into the active slots
   const hydrateSlot = async (index: number, partialData: PokemonData) => {
@@ -285,7 +288,7 @@ const App: React.FC = () => {
       box: box.map(p => miniaturize(p) as BoxPokemon), 
       teams, 
       enemyTeams, 
-      version: "6.1" 
+      version: APP_VERSION 
     };
     const jsonStr = JSON.stringify(pkg);
     return await compress(jsonStr);
@@ -327,8 +330,10 @@ const App: React.FC = () => {
     return 'text-blue-400';
   };
 
+  const currentYear = new Date().getFullYear();
+
   return (
-    <div className="min-h-screen pb-20 bg-slate-950 text-slate-100 selection:bg-indigo-500/30">
+    <div className="min-h-screen pb-4 bg-slate-950 text-slate-100 selection:bg-indigo-500/30">
       <header className="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-4 sm:px-8 py-4 sm:py-6 sticky top-0 z-[60]">
         <div className="max-w-[1920px] mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 sm:gap-5">
@@ -342,6 +347,23 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4 h-11 sm:h-14">
+            {/* Generation Selector */}
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl">
+              <Layers className="w-3.5 h-3.5 text-indigo-400" />
+              <select 
+                value={selectedGen} 
+                onChange={(e) => { 
+                  setSelectedGen(Number(e.target.value)); 
+                  handleClearTeam();
+                }}
+                className="bg-transparent text-[10px] font-black uppercase text-slate-300 outline-none cursor-pointer"
+              >
+                {GENERATIONS.map(g => (
+                  <option key={g.id} value={g.id} className="bg-slate-900 text-white">{g.name} ({g.region})</option>
+                ))}
+              </select>
+            </div>
+
             {/* Trainer Profile Button */}
             <div 
               className="h-11 w-11 sm:h-auto sm:w-auto flex items-center gap-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl sm:rounded-[1.25rem] transition-all group cursor-pointer overflow-hidden sm:px-4 sm:py-2" 
@@ -384,6 +406,23 @@ const App: React.FC = () => {
               <div className="flex items-center gap-2 mr-2">
                 <LayoutGrid className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
                 <h2 className="text-xl sm:text-2xl font-black text-white uppercase italic tracking-tight">Active Team</h2>
+              </div>
+
+              {/* Mobile Gen Selector */}
+              <div className="md:hidden flex items-center gap-2 px-3 py-1 bg-slate-900 border border-slate-800 rounded-lg">
+                <Layers className="w-3 h-3 text-indigo-400" />
+                <select 
+                  value={selectedGen} 
+                  onChange={(e) => { 
+                    setSelectedGen(Number(e.target.value)); 
+                    handleClearTeam();
+                  }}
+                  className="bg-transparent text-[10px] font-black uppercase text-slate-300 outline-none"
+                >
+                  {GENERATIONS.map(g => (
+                    <option key={g.id} value={g.id} className="bg-slate-900 text-white">{g.name}</option>
+                  ))}
+                </select>
               </div>
               
               <div className="flex items-center gap-1.5 sm:gap-2">
@@ -440,15 +479,25 @@ const App: React.FC = () => {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 lg:gap-3 xl:gap-6 items-stretch">
             {team.map((pokemon, idx) => (
-              <PokemonCard key={idx} index={idx} pokemon={pokemon} onSelect={handleSelectPokemon} onSaveToBox={handleSaveToBox} pokemonList={pokemonList} allMovesList={allMovesList} allItemsList={allItemsList} />
+              <PokemonCard 
+                key={idx} 
+                index={idx} 
+                pokemon={pokemon} 
+                onSelect={handleSelectPokemon} 
+                onSaveToBox={handleSaveToBox} 
+                pokemonList={pokemonList} 
+                allMovesList={allMovesList} 
+                allItemsList={allItemsList}
+                generation={selectedGen}
+              />
             ))}
           </div>
         </section>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 sm:gap-8">
-          <TypeChart team={team} />
+          <TypeChart team={team} generation={selectedGen} />
           <div className="flex flex-col gap-8">
-            <OffensiveMatrix team={team} />
+            <OffensiveMatrix team={team} generation={selectedGen} />
           </div>
         </div>
 
@@ -460,8 +509,27 @@ const App: React.FC = () => {
           onSaveEnemyTeam={handleSaveEnemyTeam}
           onClearEnemyTeam={handleClearEnemyTeam}
           onOpenLoadEnemyTeams={() => setVaultState({ open: true, tab: 'intel' })}
+          generation={selectedGen}
         />
       </main>
+
+      <footer className="max-w-[1920px] mx-auto px-8 py-12 mt-12 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-6 text-slate-400">
+        <div className="flex items-center gap-3">
+          <img 
+            src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/598.png" 
+            alt="Ferrothorn" 
+            className="w-10 h-10 object-contain hover:grayscale-0 transition-all cursor-help drop-shadow-[0_0_8px_rgba(100,116,139,0.3)]"
+            title="Iron Defense Enabled"
+          />
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] italic text-slate-300">
+            © {currentYear} Half Dozen <span className="ml-2 opacity-40 font-mono text-[9px] lowercase tracking-normal">v{APP_VERSION}</span>
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+          Made with <Heart className="w-3 h-3 text-red-500 fill-red-500 animate-pulse" /> by <span className="text-slate-300 font-black italic">Handyful</span>
+        </div>
+      </footer>
 
       <div className="fixed bottom-6 right-6 sm:hidden z-50">
         <button 
