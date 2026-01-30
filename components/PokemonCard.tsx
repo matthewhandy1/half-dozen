@@ -136,13 +136,13 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ index, pokemon, onSele
           style={cardBackgroundStyle}
         >
           {!pokemon ? (
-            <div className="p-6 flex-1 flex flex-col items-center justify-center">
-              <p className="text-slate-600 font-black uppercase tracking-[0.2em] text-[10px] mb-6 italic">Slot {index + 1}</p>
-              <div className="w-full relative z-10 px-2">
+            <div className="p-4 sm:p-6 flex-1 flex flex-col items-center justify-center">
+              <p className="text-slate-600 font-black uppercase tracking-[0.2em] text-[10px] mb-4 sm:mb-6 italic">Slot {index + 1}</p>
+              <div className="w-full relative z-10 px-1 sm:px-2">
                 <input 
                   type="text" 
                   placeholder="Add Pokemon" 
-                  className="w-full px-4 py-4 rounded-2xl bg-slate-950 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-slate-100 font-bold text-xs uppercase text-center italic" 
+                  className="w-full px-2 sm:px-4 py-3 sm:py-4 rounded-2xl bg-slate-950 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-slate-100 font-bold text-[10px] sm:text-xs uppercase text-center italic" 
                   value={searchTerm} 
                   onFocus={() => setIsPkmnOpen(true)} 
                   onChange={(e) => { setSearchTerm(e.target.value); setIsPkmnOpen(true); setHighlightedIndex(0); }}
