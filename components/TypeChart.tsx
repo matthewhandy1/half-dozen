@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { PokemonTeam } from '../types';
 import { getChartForGen, getTypesForGen, TYPE_COLORS } from '../constants';
 import { ShieldAlert } from 'lucide-react';
+import { TypeTooltip } from './PokemonSharedUI';
 
 interface TypeChartProps {
   team: PokemonTeam;
@@ -26,6 +27,7 @@ const ITEM_MODIFIERS: Record<string, Partial<Record<string, number>>> = {
 };
 
 export const TypeChart: React.FC<TypeChartProps> = ({ team, generation }) => {
+  const [hoveredType, setHoveredType] = useState<string | null>(null);
   const chart = getChartForGen(generation);
   const relevantTypes = getTypesForGen(generation);
 
@@ -34,14 +36,12 @@ export const TypeChart: React.FC<TypeChartProps> = ({ team, generation }) => {
     const types = pokemon.customTypes ? pokemon.customTypes.filter(t => t !== 'none') : pokemon.types.map(t => t.name);
     
     types.forEach(defendingType => { 
-      // Filter out types that don't exist in the current generation's chart
       if (relevantTypes.includes(defendingType)) {
         const mult = (chart[attackingType]?.[defendingType] ?? 1);
         multiplier *= mult;
       }
     });
 
-    // Abilities introduced in Gen 3
     if (generation >= 3 && multiplier > 0) {
       const ability = pokemon.selectedAbility?.toLowerCase().replace(/\s+/g, '-');
       if (ability && ABILITY_MODIFIERS[ability] && ABILITY_MODIFIERS[ability][attackingType] !== undefined) {
@@ -49,7 +49,6 @@ export const TypeChart: React.FC<TypeChartProps> = ({ team, generation }) => {
       }
     }
 
-    // Items introduced in Gen 2
     if (generation >= 2 && multiplier > 0) {
       const item = pokemon.selectedItem?.toLowerCase().replace(/\s+/g, '-');
       if (item && ITEM_MODIFIERS[item] && ITEM_MODIFIERS[item][attackingType] !== undefined) {
@@ -84,32 +83,29 @@ export const TypeChart: React.FC<TypeChartProps> = ({ team, generation }) => {
 
   const getScoreStyles = (score: number) => {
     if (score === 0) return "bg-slate-900/50 text-slate-700 border-slate-800 opacity-20";
-    
     if (score >= 1) {
       const intensities = [
-        "bg-red-950/20 text-red-300/60 border-red-900/20",    // 1
-        "bg-red-950/40 text-red-300/80 border-red-900/30",    // 2
-        "bg-red-900/40 text-red-200 border-red-800/40",       // 3
-        "bg-red-800/50 text-red-100 border-red-700/50",       // 4
-        "bg-red-700/70 text-white border-red-500/60 shadow-[0_0_10px_rgba(239,68,68,0.2)]", // 5
-        "bg-red-600 text-white border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)] scale-105 z-10" // 6+
+        "bg-red-950/20 text-red-300/60 border-red-900/20",
+        "bg-red-950/40 text-red-300/80 border-red-900/30",
+        "bg-red-900/40 text-red-200 border-red-800/40",
+        "bg-red-800/50 text-red-100 border-red-700/50",
+        "bg-red-700/70 text-white border-red-500/60 shadow-[0_0_10px_rgba(239,68,68,0.2)]",
+        "bg-red-600 text-white border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)] scale-105 z-10"
       ];
       return intensities[Math.min(score - 1, 5)];
     }
-    
     if (score <= -1) {
       const absScore = Math.abs(score);
       const intensities = [
-        "bg-emerald-950/20 text-emerald-300/60 border-emerald-900/20", // 1
-        "bg-emerald-950/40 text-emerald-300/80 border-emerald-900/30", // 2
-        "bg-emerald-900/40 text-emerald-200 border-emerald-800/40",    // 3
-        "bg-emerald-800/50 text-emerald-100 border-emerald-700/50",    // 4
-        "bg-emerald-700/70 text-white border-emerald-500/60 shadow-[0_0_10px_rgba(16,185,129,0.2)]", // 5
-        "bg-emerald-600 text-white border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-105 z-10" // 6+
+        "bg-emerald-950/20 text-emerald-300/60 border-emerald-900/20",
+        "bg-emerald-950/40 text-emerald-300/80 border-emerald-900/30",
+        "bg-emerald-900/40 text-emerald-200 border-emerald-800/40",
+        "bg-emerald-800/50 text-emerald-100 border-emerald-700/50",
+        "bg-emerald-700/70 text-white border-emerald-500/60 shadow-[0_0_10px_rgba(16,185,129,0.2)]",
+        "bg-emerald-600 text-white border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-105 z-10"
       ];
       return intensities[Math.min(absScore - 1, 5)];
     }
-    
     return "bg-slate-900 text-slate-700 border-slate-800";
   };
 
@@ -140,15 +136,27 @@ export const TypeChart: React.FC<TypeChartProps> = ({ team, generation }) => {
             </tr>
           </thead>
           <tbody>
-            {relevantTypes.map(type => {
+            {relevantTypes.map((type, rowIndex) => {
               const rowTotal = teamTotals.find(t => t.type === type)!;
+              const isLastRows = rowIndex >= relevantTypes.length - 6;
               return (
                 <tr key={type} className="group/row">
-                  <td className="p-0 border border-slate-800 bg-slate-900">
-                    <div className="w-full py-1.5 sm:py-2.5 px-0 rounded text-white text-[7px] sm:text-[9px] font-black uppercase text-center ring-1 ring-inset ring-white/5 overflow-hidden whitespace-nowrap" 
+                  <td 
+                    className="p-0 border border-slate-800 bg-slate-900 relative"
+                    onMouseEnter={() => setHoveredType(type)}
+                    onMouseLeave={() => setHoveredType(null)}
+                  >
+                    <div className="w-full py-1.5 sm:py-2.5 px-0 rounded text-white text-[7px] sm:text-[9px] font-black uppercase text-center ring-1 ring-inset ring-white/5 overflow-hidden whitespace-nowrap cursor-help" 
                       style={{ backgroundColor: TYPE_COLORS[type] }}>
                       {type}
                     </div>
+                    <TypeTooltip 
+                      type={type} 
+                      generation={generation} 
+                      visible={hoveredType === type} 
+                      mode="defensive" 
+                      isLast={isLastRows}
+                    />
                   </td>
                   {team.map((p, i) => {
                     if (!p) return <td key={i} className="p-0 border border-slate-800 bg-slate-900/20"></td>;

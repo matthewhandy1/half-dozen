@@ -354,7 +354,6 @@ const App: React.FC = () => {
                 value={selectedGen} 
                 onChange={(e) => { 
                   setSelectedGen(Number(e.target.value)); 
-                  handleClearTeam();
                 }}
                 className="bg-transparent text-[10px] font-black uppercase text-slate-300 outline-none cursor-pointer"
               >
@@ -415,7 +414,6 @@ const App: React.FC = () => {
                   value={selectedGen} 
                   onChange={(e) => { 
                     setSelectedGen(Number(e.target.value)); 
-                    handleClearTeam();
                   }}
                   className="bg-transparent text-[10px] font-black uppercase text-slate-300 outline-none"
                 >

@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { PokemonTeam } from '../types';
 import { getChartForGen, getTypesForGen, TYPE_COLORS } from '../constants';
 import { Sword } from 'lucide-react';
+import { TypeTooltip } from './PokemonSharedUI';
 
 interface OffensiveMatrixProps {
   team: PokemonTeam;
@@ -10,6 +11,7 @@ interface OffensiveMatrixProps {
 }
 
 export const OffensiveMatrix: React.FC<OffensiveMatrixProps> = ({ team, generation }) => {
+  const [hoveredType, setHoveredType] = useState<string | null>(null);
   const chart = getChartForGen(generation);
   const relevantTypes = getTypesForGen(generation);
 
@@ -42,12 +44,12 @@ export const OffensiveMatrix: React.FC<OffensiveMatrixProps> = ({ team, generati
 
     if (score >= 1) {
       const intensities = [
-        "bg-emerald-950/20 text-emerald-300/60 border-emerald-900/20", // 1
-        "bg-emerald-950/40 text-emerald-300/80 border-emerald-900/30", // 2
-        "bg-emerald-900/40 text-emerald-200 border-emerald-800/40",    // 3
-        "bg-emerald-800/50 text-emerald-100 border-emerald-700/50",    // 4
-        "bg-emerald-700/70 text-white border-emerald-500/60 shadow-[0_0_10px_rgba(16,185,129,0.2)]", // 5
-        "bg-emerald-600 text-white border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-105 z-10" // 6+
+        "bg-emerald-950/20 text-emerald-300/60 border-emerald-900/20",
+        "bg-emerald-950/40 text-emerald-300/80 border-emerald-900/30",
+        "bg-emerald-900/40 text-emerald-200 border-emerald-800/40",
+        "bg-emerald-800/50 text-emerald-100 border-emerald-700/50",
+        "bg-emerald-700/70 text-white border-emerald-500/60 shadow-[0_0_10px_rgba(16,185,129,0.2)]",
+        "bg-emerald-600 text-white border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-105 z-10"
       ];
       return intensities[Math.min(score - 1, 5)];
     }
@@ -55,12 +57,12 @@ export const OffensiveMatrix: React.FC<OffensiveMatrixProps> = ({ team, generati
     if (score <= -1) {
       const absScore = Math.abs(score);
       const intensities = [
-        "bg-red-950/20 text-red-300/60 border-red-900/20",    // 1
-        "bg-red-950/40 text-red-300/80 border-red-900/30",    // 2
-        "bg-red-900/40 text-red-200 border-red-800/40",       // 3
-        "bg-red-800/50 text-red-100 border-red-700/50",       // 4
-        "bg-red-700/70 text-white border-red-500/60 shadow-[0_0_10px_rgba(239,68,68,0.2)]", // 5
-        "bg-red-600 text-white border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)] scale-105 z-10" // 6+
+        "bg-red-950/20 text-red-300/60 border-red-900/20",
+        "bg-red-950/40 text-red-300/80 border-red-900/30",
+        "bg-red-900/40 text-red-200 border-red-800/40",
+        "bg-red-800/50 text-red-100 border-red-700/50",
+        "bg-red-700/70 text-white border-red-500/60 shadow-[0_0_10px_rgba(239,68,68,0.2)]",
+        "bg-red-600 text-white border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)] scale-105 z-10"
       ];
       return intensities[Math.min(absScore - 1, 5)];
     }
@@ -102,15 +104,27 @@ export const OffensiveMatrix: React.FC<OffensiveMatrixProps> = ({ team, generati
             </tr>
           </thead>
           <tbody>
-            {relevantTypes.map(type => {
+            {relevantTypes.map((type, rowIndex) => {
               const rowCoverage = teamCoverage.find(t => t.type === type)!;
+              const isLastRows = rowIndex >= relevantTypes.length - 6;
               return (
                 <tr key={type} className="group/row">
-                  <td className="p-0 border border-slate-800 bg-slate-900">
-                    <div className="w-full py-1.5 sm:py-2.5 px-0 rounded text-white text-[7px] sm:text-[9px] font-black uppercase text-center ring-1 ring-inset ring-white/5 overflow-hidden whitespace-nowrap" 
+                  <td 
+                    className="p-0 border border-slate-800 bg-slate-900 relative"
+                    onMouseEnter={() => setHoveredType(type)}
+                    onMouseLeave={() => setHoveredType(null)}
+                  >
+                    <div className="w-full py-1.5 sm:py-2.5 px-0 rounded text-white text-[7px] sm:text-[9px] font-black uppercase text-center ring-1 ring-inset ring-white/5 overflow-hidden whitespace-nowrap cursor-help" 
                       style={{ backgroundColor: TYPE_COLORS[type] }}>
                       {type}
                     </div>
+                    <TypeTooltip 
+                      type={type} 
+                      generation={generation} 
+                      visible={hoveredType === type} 
+                      mode="offensive" 
+                      isLast={isLastRows}
+                    />
                   </td>
                   {team.map((p, i) => {
                     const m = p ? getBestEffectiveness(type, p) : -1;
