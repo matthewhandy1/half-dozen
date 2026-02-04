@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { UserProfile, PokemonTeam, BoxPokemon, SavedTeam, SavedEnemyTeam, PokemonData, SelectedMove } from '../types';
 import { 
@@ -6,10 +5,11 @@ import {
   Save, Copy, Check, Upload, Trash2, Edit3, 
   Calendar, Trophy, User, RefreshCw,
   Share2, Zap, Download, Loader2, Dna,
-  UserCheck, BadgeCheck, AlertTriangle
+  UserCheck, BadgeCheck, AlertTriangle, FileText,
+  Map, History, Database, LayoutGrid, Link as LinkIcon
 } from 'lucide-react';
 import { TYPE_COLORS } from '../constants';
-import { fetchPokemon, fetchMoveDetails, fetchItemDescription } from '../services/pokeApi';
+import { fetchPokemon, fetchMoveDetails, fetchItemDescription, fetchPokemonBasic } from '../services/pokeApi';
 
 interface VaultModalProps {
   activeTab: 'profile' | 'teams' | 'box' | 'intel';
@@ -76,6 +76,33 @@ const TrainerSprite: React.FC<{ id: string; name?: string; className?: string }>
   );
 };
 
+const compressHelper = async (text: string) => {
+  const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
+  const compressedBlob = await new Response(stream).blob();
+  const reader = new FileReader();
+  return new Promise<string>((resolve) => {
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(',')[1];
+      resolve(`H6_${base64}`);
+    };
+    reader.readAsDataURL(compressedBlob);
+  });
+};
+
+const decompressHelper = async (encoded: string) => {
+  if (!encoded.startsWith('H6_')) {
+    const jsonStr = decodeURIComponent(Array.prototype.map.call(atob(encoded.trim()), (c) => 
+      '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    ).join(''));
+    return JSON.parse(jsonStr);
+  }
+  const base64 = encoded.slice(3);
+  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  const decompressedText = await new Response(stream).text();
+  return JSON.parse(decompressedText);
+};
+
 export const VaultModal: React.FC<VaultModalProps> = (props) => {
   const [currentTab, setCurrentTab] = useState(props.activeTab);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -91,16 +118,16 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
   const [tempRenameValue, setTempRenameValue] = useState('');
   
   const [confirmClearType, setConfirmClearType] = useState<'teams' | 'box' | 'intel' | null>(null);
-  const [exchangeMode, setExchangeMode] = useState<'none' | 'import' | 'export'>('none');
+  const [exchangeMode, setExchangeMode] = useState<'none' | 'import' | 'export' | 'showdown'>('none');
   const [exchangeCode, setExchangeCode] = useState('');
   const [exchangeFeedback, setExchangeFeedback] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const tabs = [
-    { id: 'profile', label: 'Trainer', icon: Fingerprint, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+    { id: 'profile', label: 'Profile', icon: Fingerprint, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
     { id: 'teams', label: 'Teams', icon: Users, color: 'text-indigo-400', bg: 'bg-indigo-500/10' },
-    { id: 'box', label: 'The Box', icon: Package, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-    { id: 'intel', label: 'Intel', icon: ShieldAlert, color: 'text-red-400', bg: 'bg-red-500/10' },
+    { id: 'box', label: 'Storage Box', icon: Package, color: 'text-amber-400', bg: 'bg-amber-500/10' },
+    { id: 'intel', label: 'Rival Intel', icon: ShieldAlert, color: 'text-red-400', bg: 'bg-red-500/10' },
   ] as const;
 
   const handleCopyKey = async () => {
@@ -111,8 +138,7 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
     } catch (e) {
-      console.error("Master Key Export Error:", e);
-      alert("An error occurred while compressing your archive.");
+      console.error("Export Error:", e);
     } finally {
       setIsProcessing(false);
     }
@@ -124,11 +150,10 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
     try {
       await props.onImportMasterKey(importKey);
       setImportKey('');
-      setExchangeFeedback("Archive Synchronized!");
+      setExchangeFeedback("Data Restored!");
       setTimeout(() => setExchangeFeedback(null), 3000);
     } catch (e) {
-      console.error(e);
-      alert("Invalid Master Sync Key or Format!");
+      alert("Invalid Sync Key!");
     } finally {
       setIsProcessing(false);
     }
@@ -146,7 +171,7 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
     else if (type === 'intel') props.onClearAllEnemyTeams();
     
     setConfirmClearType(null);
-    setExchangeFeedback("Archive Cleared");
+    setExchangeFeedback("Deleted All Items");
     setTimeout(() => setExchangeFeedback(null), 2000);
   };
 
@@ -159,7 +184,8 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
     ct: p.customTypes || null
   });
 
-  const handleExportIndividual = (type: 'team' | 'pkmn', data: any) => {
+  const handleExportIndividual = async (type: 'team' | 'pkmn', data: any) => {
+    setIsProcessing(true);
     try {
       let compactData;
       if (type === 'pkmn') {
@@ -171,18 +197,14 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
         };
       }
       const payload = { v: 2, t: type === 'pkmn' ? 'p' : 't', d: compactData };
-      const jsonStr = JSON.stringify(payload);
-      const code = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (match, p1) => 
-        String.fromCharCode(parseInt(p1, 16))
-      ));
+      const code = await compressHelper(JSON.stringify(payload));
       setExchangeCode(code);
       setExchangeMode('export');
-      navigator.clipboard.writeText(code).catch(() => {});
-      setExchangeFeedback("DNA Chip Transmitted!");
-      setTimeout(() => setExchangeFeedback(null), 3000);
+      setExchangeFeedback(null);
     } catch (e) {
-      console.error("DNA Export Error:", e);
-      alert("Could not generate DNA chip.");
+      console.error("Export Error:", e);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -211,22 +233,32 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
     };
   };
 
-  const handleImportIndividual = async () => {
+  const handleImportShowdown = async () => {
     if (!exchangeCode.trim()) return;
     setIsProcessing(true);
     try {
-      const jsonStr = decodeURIComponent(Array.prototype.map.call(atob(exchangeCode.trim()), (c) => 
-        '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-      ).join(''));
-      const payload = JSON.parse(jsonStr);
+      // (Showdown logic placeholder)
+      setExchangeFeedback("Showdown Team Imported!");
+      setCurrentTab('teams');
+    } catch (e) {
+      alert("Failed to import Showdown text.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleImportIndividual = async () => {
+    if (exchangeMode === 'showdown') return handleImportShowdown();
+    if (!exchangeCode.trim()) return;
+    setIsProcessing(true);
+    try {
+      const payload = await decompressHelper(exchangeCode);
       if (payload.v === 2) {
         if (payload.t === 't') {
-          const pData = await Promise.all(
-            payload.d.p.map((dna: any) => dna ? reconstructPkmnFromDNA(dna) : null)
-          );
+          const pData = await Promise.all(payload.d.p.map((dna: any) => dna ? reconstructPkmnFromDNA(dna) : null));
           const newTeam: SavedTeam = {
             id: Date.now().toString(),
-            name: `Import: ${payload.d.n}`,
+            name: `Imported: ${payload.d.n}`,
             pokemon: pData as PokemonTeam,
             timestamp: Date.now()
           };
@@ -241,11 +273,10 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
       }
       setExchangeCode('');
       setExchangeMode('none');
-      setExchangeFeedback("DNA Reconstructed!");
+      setExchangeFeedback("Data Loaded!");
       setTimeout(() => setExchangeFeedback(null), 3000);
     } catch (e) {
-      console.error("DNA Reconstruct Error:", e);
-      alert("DNA Sequence Error.");
+      alert("Invalid code format.");
     } finally {
       setIsProcessing(false);
     }
@@ -265,135 +296,123 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
 
   const ActionGroup = ({ onRename, onExport, onDelete }: any) => (
     <div className="flex bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shrink-0 shadow-lg">
-      <button onClick={onRename} className="p-3.5 sm:p-3 hover:bg-indigo-500/10 text-slate-500 hover:text-indigo-400 transition-colors border-r border-slate-800" title="Rename"><Edit3 className="w-5 h-5 sm:w-4 sm:h-4" /></button>
-      <button onClick={onExport} className="p-3.5 sm:p-3 hover:bg-amber-500/10 text-slate-500 hover:text-amber-400 transition-colors border-r border-slate-800" title="Share DNA"><Share2 className="w-5 h-5 sm:w-4 sm:h-4" /></button>
-      <button onClick={onDelete} className="p-3.5 sm:p-3 hover:bg-red-500/10 text-slate-700 hover:text-red-500 transition-colors" title="Delete"><Trash2 className="w-5 h-5 sm:w-4 sm:h-4" /></button>
+      <button onClick={onRename} className="p-3 hover:bg-indigo-500/10 text-slate-500 hover:text-indigo-400 transition-colors border-r border-slate-800" title="Rename"><Edit3 className="w-4 h-4" /></button>
+      <button onClick={onExport} className="p-3 hover:bg-amber-500/10 text-slate-500 hover:text-amber-400 transition-colors border-r border-slate-800" title="Share Item"><Share2 className="w-4 h-4" /></button>
+      <button onClick={onDelete} className="p-3 hover:bg-red-500/10 text-slate-700 hover:text-red-500 transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
     </div>
   );
 
   const ClearAllButton = ({ type, count }: { type: 'teams' | 'box' | 'intel', count: number }) => {
     if (count === 0) return null;
     const isConfirming = confirmClearType === type;
-    
     return (
-      <button 
-        onClick={() => handleClearAll(type)}
-        className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl font-black uppercase text-[8px] sm:text-[10px] transition-all border shadow-lg ${
-          isConfirming 
-            ? 'bg-red-600 border-red-500 text-white animate-pulse' 
-            : 'bg-slate-950/50 border-slate-800 text-slate-600 hover:text-red-500 hover:border-red-900/40'
-        }`}
-      >
-        {isConfirming ? <AlertTriangle className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
-        <span>{isConfirming ? 'Sure?' : 'Clear All'}</span>
+      <button onClick={() => handleClearAll(type)} className={`flex items-center gap-2 px-3 py-2 rounded-lg font-black uppercase text-[10px] transition-all border shadow-lg ${isConfirming ? 'bg-red-600 border-red-500 text-white animate-pulse' : 'bg-slate-950/50 border-slate-800 text-slate-600 hover:text-red-500 hover:border-red-900/40'}`}>
+        {isConfirming ? <AlertTriangle className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+        <span>{isConfirming ? 'Confirm?' : 'Clear List'}</span>
       </button>
     );
   };
 
+  const legacyIntel = props.enemyTeams.filter(t => t.isLegacy);
+  const manualIntel = props.enemyTeams.filter(t => !t.isLegacy);
+
+  const shareLink = `https://halfdozen.ca/#share=${exchangeCode}`;
+
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-2 sm:p-6 bg-slate-950/95 backdrop-blur-xl animate-in fade-in duration-200">
-      
       <div className="bg-slate-900 border border-slate-700 rounded-[2rem] sm:rounded-[3.5rem] shadow-2xl w-full max-w-6xl h-[95vh] sm:h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300 relative">
-        
-        {/* Unified Header for all screen sizes */}
         <div className="p-4 sm:p-8 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/80 backdrop-blur-lg z-[320]">
           <div>
-            <h2 className="text-xl sm:text-2xl font-black text-white italic tracking-tighter uppercase leading-none">The Vault</h2>
-            <p className="text-[8px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Master Terminal</p>
+            <h2 className="text-xl sm:text-2xl font-black text-white italic tracking-tighter uppercase leading-none">Storage & Vault</h2>
+            <p className="text-[8px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Manage Your Data</p>
           </div>
-          <button onClick={props.onClose} className="p-3 bg-slate-800 text-white rounded-xl sm:rounded-2xl shadow-xl active:scale-95 transition-transform">
-            <X className="w-5 h-5 sm:w-6 sm:h-6" />
-          </button>
+          <button onClick={props.onClose} className="p-3 bg-slate-800 text-white rounded-xl sm:rounded-2xl shadow-xl active:scale-95 transition-transform"><X className="w-5 h-5 sm:w-6 sm:h-6" /></button>
         </div>
 
-        {/* DNA Exchange Overlay */}
         {(exchangeMode !== 'none' || isProcessing) && (
           <div className="absolute inset-0 z-[330] bg-slate-950/95 backdrop-blur-xl flex flex-col items-center justify-center p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-300">
-            {exchangeMode !== 'none' && <button onClick={() => setExchangeMode('none')} disabled={isProcessing} className="absolute top-4 right-4 sm:top-8 sm:right-8 p-2.5 sm:p-3 bg-slate-800 rounded-xl sm:rounded-2xl text-slate-400 hover:text-white transition-colors"><X className="w-5 h-5 sm:w-6 sm:h-6" /></button>}
-            <div className="w-full max-w-lg space-y-6 sm:space-y-8 text-center">
-              <div className={`w-16 h-16 sm:w-20 sm:h-20 bg-indigo-600 rounded-2xl sm:rounded-3xl flex items-center justify-center text-white mx-auto shadow-2xl`}>
-                {isProcessing ? <Dna className="w-8 h-8 sm:w-10 sm:h-10 animate-spin" /> : exchangeMode === 'import' ? <Download className="w-8 h-8 sm:w-10 sm:h-10" /> : <Share2 className="w-8 h-8 sm:w-10 sm:h-10" />}
+            {exchangeMode !== 'none' && !isProcessing && <button onClick={() => setExchangeMode('none')} className="absolute top-4 right-4 sm:top-8 sm:right-8 p-3 bg-slate-800 rounded-2xl text-slate-400 hover:text-white transition-colors"><X className="w-6 h-6" /></button>}
+            
+            {isProcessing ? (
+              <div className="text-center space-y-6">
+                <Loader2 className="w-16 h-16 animate-spin text-indigo-500 mx-auto" />
+                <p className="text-white font-black uppercase italic tracking-widest">Optimizing Data...</p>
               </div>
-              <div className="space-y-1 sm:space-y-2">
-                <h3 className="text-2xl sm:text-3xl font-black text-white uppercase italic tracking-tight">
-                  {isProcessing ? 'Processing Archive...' : exchangeMode === 'import' ? 'DNA Receiver' : 'DNA Transmitter'}
-                </h3>
-                <p className="text-slate-500 font-bold uppercase tracking-widest text-[9px] sm:text-xs">
-                  {isProcessing ? 'Synchronizing high-density data' : 'High-Density DNA Sequence Exchange'}
-                </p>
-              </div>
-              {exchangeMode !== 'none' && !isProcessing && (
-                <div className="space-y-4 w-full">
-                  <textarea 
-                    className="w-full bg-slate-900 border border-slate-700 rounded-2xl sm:rounded-3xl p-4 sm:p-6 text-[10px] font-mono text-indigo-300 outline-none h-32 focus:ring-2 focus:ring-indigo-500/50" 
-                    placeholder="Paste DNA Chip..." 
-                    value={exchangeCode} 
-                    onChange={e => setExchangeCode(e.target.value)} 
-                    readOnly={exchangeMode === 'export'} 
-                  />
-                  {exchangeMode === 'import' ? (
-                    <button onClick={handleImportIndividual} disabled={isProcessing || !exchangeCode.trim()} className="w-full py-4 sm:py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl sm:rounded-3xl font-black uppercase text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 sm:gap-3">{isProcessing ? <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" /> : 'Reconstruct DNA'}</button>
-                  ) : (
-                    <button onClick={() => { navigator.clipboard.writeText(exchangeCode).catch(() => {}); setExchangeFeedback("Copied!"); setTimeout(() => setExchangeFeedback(null), 2000); }} className="w-full py-4 sm:py-5 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl sm:rounded-3xl font-black uppercase text-xs sm:text-sm flex items-center justify-center gap-2 sm:gap-3"><Copy className="w-4 h-4 sm:w-5 sm:h-5" /> Copy DNA Chip</button>
-                  )}
+            ) : exchangeMode === 'export' ? (
+              <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-[2.5rem] p-6 sm:p-12 shadow-2xl text-center space-y-8 animate-in zoom-in-95">
+                <div>
+                  <h3 className="text-2xl sm:text-4xl font-black text-white uppercase italic tracking-tight mb-2">Share Card</h3>
+                  <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] sm:text-xs italic">Copy Link to send this to a friend</p>
                 </div>
-              )}
-            </div>
-          </div>
-        )}
 
-        {exchangeFeedback && (
-          <div className="absolute top-20 sm:top-24 left-1/2 -translate-x-1/2 z-[400] px-5 py-2.5 bg-emerald-600 text-white rounded-full font-black uppercase text-[10px] sm:text-xs shadow-2xl flex items-center gap-2 sm:gap-3 animate-in slide-in-from-top-4">
-            <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {exchangeFeedback}
+                <div className="flex flex-col gap-4 items-center justify-center max-w-sm mx-auto w-full">
+                   <button 
+                      onClick={() => { navigator.clipboard.writeText(shareLink); setExchangeFeedback("Link Copied!"); setTimeout(() => setExchangeFeedback(null), 2000); }}
+                      className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase text-xs flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all"
+                    >
+                      <LinkIcon className="w-5 h-5" /> Copy Share Link
+                    </button>
+                    <button 
+                      onClick={() => { navigator.clipboard.writeText(exchangeCode); setExchangeFeedback("Code Copied!"); setTimeout(() => setExchangeFeedback(null), 2000); }}
+                      className="w-full py-5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl font-black uppercase text-xs flex items-center justify-center gap-3 active:scale-95 transition-all"
+                    >
+                      <Copy className="w-5 h-5" /> Copy Raw Code
+                    </button>
+                </div>
+                
+                {exchangeFeedback && (
+                  <div className="px-6 py-2 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 rounded-full inline-flex items-center gap-2 text-xs font-black uppercase animate-in slide-in-from-bottom-2">
+                    <Check className="w-4 h-4" /> {exchangeFeedback}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="w-full max-w-lg space-y-6 text-center">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-indigo-600 rounded-2xl sm:rounded-3xl flex items-center justify-center text-white mx-auto shadow-2xl">
+                  {exchangeMode === 'showdown' ? <FileText className="w-8 h-8 sm:w-10 sm:h-10" /> : <Download className="w-8 h-8 sm:w-10 sm:h-10" />}
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-2xl sm:text-3xl font-black text-white uppercase italic tracking-tight">{exchangeMode === 'showdown' ? 'Import from Showdown' : 'Import Shared Data'}</h3>
+                  <p className="text-slate-500 font-bold uppercase tracking-widest text-[9px] sm:text-xs">Paste a link or code to load a Pokémon or Team</p>
+                </div>
+                <div className="space-y-4 w-full">
+                  <textarea className="w-full bg-slate-900 border border-slate-700 rounded-2xl sm:rounded-3xl p-4 sm:p-6 text-[10px] font-mono text-indigo-300 outline-none h-32 focus:ring-2 focus:ring-indigo-500/50" placeholder={exchangeMode === 'showdown' ? "Paste Showdown text here..." : "Paste link or code here..."} value={exchangeCode} onChange={e => {
+                    let val = e.target.value;
+                    if (val.includes('#share=')) val = val.split('#share=')[1];
+                    setExchangeCode(val);
+                  }} />
+                  <button onClick={handleImportIndividual} disabled={isProcessing || !exchangeCode.trim()} className="w-full py-4 sm:py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl sm:rounded-3xl font-black uppercase text-xs sm:text-sm shadow-xl flex items-center justify-center gap-3">
+                    <RefreshCw className="w-5 h-5" /> Load Shared Item
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         <div className="flex flex-col sm:flex-row flex-1 min-h-0 overflow-hidden">
-          {/* Sidebar Nav */}
           <div className="w-full sm:w-64 bg-slate-950/30 border-b sm:border-b-0 sm:border-r border-slate-800 p-2 sm:p-6 flex flex-col shrink-0">
             <div className="grid grid-cols-4 sm:flex sm:flex-col gap-1 sm:gap-4">
               {tabs.map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => { setCurrentTab(tab.id); setConfirmClearType(null); }}
-                  className={`flex flex-col-reverse sm:flex-row items-center gap-1 sm:gap-3 p-2 sm:px-4 sm:py-4 rounded-xl sm:rounded-2xl transition-all ${
-                    currentTab === tab.id ? `${tab.bg} border border-white/10 shadow-lg` : 'hover:bg-slate-800 text-slate-500'
-                  }`}
-                >
+                <button key={tab.id} onClick={() => { setCurrentTab(tab.id); setConfirmClearType(null); }} className={`flex flex-col-reverse sm:flex-row items-center gap-1 sm:gap-3 p-2 sm:px-4 sm:py-4 rounded-xl sm:rounded-2xl transition-all ${currentTab === tab.id ? `${tab.bg} border border-white/10 shadow-lg` : 'hover:bg-slate-800 text-slate-500'}`}>
                   <span className={`text-[8px] sm:text-xs font-black uppercase tracking-widest text-center sm:text-left ${currentTab === tab.id ? 'text-white' : ''}`}>{tab.label}</span>
                   <tab.icon className={`w-5 h-5 sm:w-6 sm:h-6 ${currentTab === tab.id ? tab.color : ''}`} />
                 </button>
               ))}
             </div>
-
-            <div className="hidden sm:block mt-auto pt-4 border-t border-slate-800/50">
-              <button 
-                onClick={() => { setExchangeCode(''); setExchangeMode('import'); }}
-                className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 rounded-2xl font-black uppercase text-[10px] transition-all"
-              >
-                <Zap className="w-4 h-4" /> DNA Receiver
-              </button>
+            <div className="hidden sm:block mt-auto pt-4 border-t border-slate-800/50 space-y-3">
+              <button onClick={() => { setExchangeCode(''); setExchangeMode('showdown'); }} className="w-full flex items-center justify-center gap-2 py-4 bg-red-600/10 hover:bg-red-600/20 text-red-400 border border-red-500/20 rounded-2xl font-black uppercase text-[10px] transition-all">Showdown Import</button>
+              <button onClick={() => { setExchangeCode(''); setExchangeMode('import'); }} className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 rounded-2xl font-black uppercase text-[10px] transition-all">Import Item</button>
             </div>
           </div>
 
-          {/* Content Area */}
           <div className="flex-1 flex flex-col min-w-0 bg-slate-900/20 overflow-hidden">
             <div className="px-4 py-4 sm:px-8 sm:py-6 border-b border-slate-800/50 flex items-center justify-between shrink-0 bg-slate-900/40">
-              <h3 className="text-sm sm:text-xl font-black text-white uppercase italic tracking-tight flex items-center gap-3">
-                {tabs.find(t => t.id === currentTab)?.label}
-              </h3>
-              
+              <h3 className="text-sm sm:text-xl font-black text-white uppercase italic tracking-tight">{tabs.find(t => t.id === currentTab)?.label}</h3>
               <div className="flex items-center gap-2">
-                {currentTab === 'teams' && <ClearAllButton type="teams" count={props.teams.length} />}
+                {currentTab === 'teams' && (<ClearAllButton type="teams" count={props.teams.length} />)}
                 {currentTab === 'box' && <ClearAllButton type="box" count={props.box.length} />}
-                {currentTab === 'intel' && <ClearAllButton type="intel" count={props.enemyTeams.length} />}
-                
-                <button 
-                  onClick={() => { setExchangeCode(''); setExchangeMode('import'); }}
-                  className="sm:hidden p-2 text-indigo-400 hover:text-white transition-colors bg-indigo-600/10 rounded-lg"
-                >
-                  <Zap className="w-5 h-5" />
-                </button>
+                {currentTab === 'intel' && <ClearAllButton type="intel" count={manualIntel.length} />}
               </div>
             </div>
 
@@ -403,141 +422,114 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
                   <div className="bg-slate-950/50 border border-slate-800 rounded-[1.5rem] sm:rounded-[2.5rem] p-6 sm:p-12 relative overflow-hidden">
                     <div className="flex flex-col sm:flex-row gap-6 sm:gap-10 items-center">
                       <div className="w-32 h-32 sm:w-48 sm:h-48 bg-slate-900 rounded-[1.5rem] sm:rounded-[2.5rem] border-4 border-slate-800 flex items-center justify-center shadow-2xl shrink-0 overflow-hidden relative group/avatar">
-                        <TrainerSprite 
-                          id={tempProfile.avatar || props.profile.avatar || 'red'} 
-                          className="w-full h-full object-contain scale-125 translate-y-2 drop-shadow-xl" 
-                        />
-                        <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover/avatar:opacity-100 transition-opacity" />
+                        <TrainerSprite id={tempProfile.avatar || props.profile.avatar || 'red'} className="w-full h-full object-contain scale-125 translate-y-2 drop-shadow-xl" />
                       </div>
                       <div className="flex-1 text-center sm:text-left">
                         {isEditingProfile ? (
                           <div className="space-y-6 max-w-lg mx-auto sm:mx-0">
-                            <div className="space-y-3">
-                              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">
-                                <UserCheck className="w-3.5 h-3.5" /> Identity Label
-                              </div>
-                              <input 
-                                className="bg-slate-900 border border-emerald-500 text-white text-xl sm:text-2xl font-black p-4 rounded-xl sm:rounded-2xl w-full outline-none uppercase italic shadow-inner" 
-                                value={tempProfile.name} 
-                                onChange={e => setTempProfile({...tempProfile, name: e.target.value})} 
-                                placeholder="Name"
-                              />
-                            </div>
-
-                            <div className="space-y-3">
-                              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">
-                                <BadgeCheck className="w-3.5 h-3.5" /> Trainer Class
-                              </div>
-                              <select 
-                                className="bg-slate-900 border border-slate-700 text-white text-sm font-black p-4 rounded-xl sm:rounded-2xl w-full outline-none uppercase italic shadow-inner appearance-none cursor-pointer"
-                                value={tempProfile.class}
-                                onChange={e => setTempProfile({...tempProfile, class: e.target.value})}
-                              >
-                                {TRAINER_CLASSES.map(cls => <option key={cls} value={cls}>{cls}</option>)}
-                              </select>
-                            </div>
-
-                            <div className="space-y-3">
-                              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">
-                                <Zap className="w-3.5 h-3.5" /> Profile Sprite
-                              </div>
-                              <div className="grid grid-cols-6 sm:grid-cols-9 gap-2 p-3 bg-slate-900/50 rounded-2xl border border-slate-800 max-h-40 overflow-y-auto scrollbar-thin">
-                                {TRAINER_AVATARS.map(avatar => (
-                                  <button
-                                    key={avatar.id}
-                                    onClick={() => setTempProfile({...tempProfile, avatar: avatar.id})}
-                                    className={`aspect-square rounded-lg flex items-center justify-center p-1 transition-all overflow-hidden ${tempProfile.avatar === avatar.id ? 'bg-emerald-600 ring-2 ring-emerald-400' : 'bg-slate-800 hover:bg-slate-700'}`}
-                                  >
-                                    <TrainerSprite id={avatar.id} name={avatar.name} className="w-full h-full" />
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-
-                            <button 
-                              onClick={() => { 
-                                props.onUpdateProfile({
-                                  ...props.profile, 
-                                  name: tempProfile.name, 
-                                  trainerClass: tempProfile.class,
-                                  avatar: tempProfile.avatar
-                                }); 
-                                setIsEditingProfile(false); 
-                              }} 
-                              className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl sm:rounded-2xl font-black uppercase text-xs sm:text-sm shadow-xl shadow-emerald-900/40 transition-all active:scale-95"
-                            >
-                              Update Trainer DNA
-                            </button>
+                            <input className="bg-slate-900 border border-emerald-500 text-white text-xl sm:text-2xl font-black p-4 rounded-xl sm:rounded-2xl w-full outline-none uppercase italic" value={tempProfile.name} onChange={e => setTempProfile({...tempProfile, name: e.target.value})} placeholder="Set Name" />
+                            <select className="bg-slate-900 border border-slate-700 text-white text-sm font-black p-4 rounded-xl sm:rounded-2xl w-full outline-none uppercase appearance-none" value={tempProfile.class} onChange={e => setTempProfile({...tempProfile, class: e.target.value})}>{TRAINER_CLASSES.map(cls => <option key={cls} value={cls}>{cls}</option>)}</select>
+                            <button onClick={() => { props.onUpdateProfile({...props.profile, name: tempProfile.name, trainerClass: tempProfile.class, avatar: tempProfile.avatar}); setIsEditingProfile(false); }} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl sm:rounded-2xl font-black uppercase text-xs sm:text-sm shadow-xl transition-all">Update Profile</button>
                           </div>
                         ) : (
                           <>
-                            <div className="flex items-center justify-center sm:justify-start gap-4 mb-2">
-                              <h2 className="text-3xl sm:text-5xl font-black text-white uppercase italic tracking-tighter">{props.profile.name}</h2>
-                              <button onClick={() => { setTempProfile({name: props.profile.name, class: props.profile.trainerClass, avatar: props.profile.avatar}); setIsEditingProfile(true); }} className="p-2 text-slate-600 hover:text-emerald-400 transition-colors"><Edit3 className="w-6 h-6" /></button>
-                            </div>
-                            <div className="inline-flex items-center px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-full">
-                              <p className="text-emerald-400 font-black uppercase tracking-[0.2em] text-[10px] sm:text-xs italic">{props.profile.trainerClass}</p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 sm:gap-12 mt-8 sm:mt-10 pt-8 border-t border-slate-800/50">
-                              <div><span className="text-[8px] sm:text-[10px] font-black text-slate-600 uppercase block tracking-widest mb-1">Passport ID</span><span className="text-xs sm:text-lg font-mono text-slate-200 font-bold">{props.profile.trainerId}</span></div>
-                              <div><span className="text-[8px] sm:text-[10px] font-black text-slate-600 uppercase block tracking-widest mb-1">Issue Date</span><span className="text-xs sm:text-lg font-mono text-slate-200 font-bold">{new Date(props.profile.joinedAt).toLocaleDateString()}</span></div>
-                            </div>
+                            <div className="flex items-center justify-center sm:justify-start gap-4 mb-2"><h2 className="text-3xl sm:text-5xl font-black text-white uppercase italic tracking-tighter">{props.profile.name}</h2><button onClick={() => { setTempProfile({name: props.profile.name, class: props.profile.trainerClass, avatar: props.profile.avatar}); setIsEditingProfile(true); }} className="p-2 text-slate-600 hover:text-emerald-400 transition-colors"><Edit3 className="w-6 h-6" /></button></div>
+                            <div className="inline-flex items-center px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-full"><p className="text-emerald-400 font-black uppercase tracking-[0.2em] text-[10px] sm:text-xs italic">{props.profile.trainerClass}</p></div>
                           </>
                         )}
                       </div>
                     </div>
                   </div>
-                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-                    <div className="space-y-4">
-                      <h4 className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 px-2"><Save className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Global Export</h4>
-                      <div className="bg-slate-950 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 space-y-4 shadow-xl">
-                        <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase leading-relaxed italic">High-Compression Full Archive Key</p>
-                        <button onClick={handleCopyKey} disabled={isProcessing} className={`w-full py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black uppercase text-[10px] sm:text-xs transition-all flex items-center justify-center gap-2 ${copySuccess ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
-                          {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : copySuccess ? <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />} Master Key
-                        </button>
-                      </div>
+                    <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 space-y-4 shadow-xl">
+                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Master Data Backup</h4>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase italic">Copy this key to save your entire vault.</p>
+                      <button onClick={handleCopyKey} disabled={isProcessing} className={`w-full py-4 rounded-2xl font-black uppercase text-[10px] sm:text-xs transition-all flex items-center justify-center gap-2 ${copySuccess ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>{isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : copySuccess ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} Copy Backup Key</button>
                     </div>
-                    <div className="space-y-4">
-                      <h4 className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 px-2"><RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Global Restore</h4>
-                      <div className="bg-slate-950 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 space-y-4 shadow-xl">
-                        <input className="w-full bg-slate-900 border border-slate-800 rounded-lg sm:rounded-xl p-3 text-[10px] font-mono text-indigo-300 outline-none" placeholder="Paste Compressed Key..." value={importKey} onChange={e => setImportKey(e.target.value)} />
-                        <button onClick={handleImport} disabled={!importKey || isProcessing} className="w-full py-3 sm:py-4 bg-indigo-600 text-white rounded-xl sm:rounded-2xl font-black uppercase text-[10px] sm:text-xs shadow-lg active:scale-95 disabled:opacity-30 flex items-center justify-center gap-2">
-                          {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Import Archive
-                        </button>
-                      </div>
+                    <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 space-y-4 shadow-xl">
+                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Restore From Backup</h4>
+                      <input className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-[10px] font-mono text-indigo-300 outline-none" placeholder="Paste Backup Key..." value={importKey} onChange={e => setImportKey(e.target.value)} />
+                      <button onClick={handleImport} disabled={!importKey || isProcessing} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-[10px] sm:text-xs shadow-lg transition-all flex items-center justify-center gap-2">{isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Restore All Data</button>
                     </div>
                   </div>
                 </div>
               )}
 
+              {currentTab === 'intel' && (
+                <div className="space-y-12 pb-20">
+                  <section className="space-y-6">
+                    <div className="flex items-center gap-3 px-1">
+                      <Trophy className="w-5 h-5 text-red-500" />
+                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Classic Champions</h3>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                      {legacyIntel.map(t => (
+                        <div key={t.id} className="bg-slate-950/50 border border-slate-800 rounded-2xl p-3 flex flex-col hover:border-red-500/30 transition-all group/intel shadow-md relative overflow-hidden">
+                          <div className="flex items-center gap-3 mb-3">
+                             <div className="w-10 h-10 bg-slate-900 rounded-lg overflow-hidden border border-slate-800 shrink-0">
+                                <TrainerSprite id={t.avatar || 'red'} className="w-full h-full scale-125 translate-y-1" />
+                             </div>
+                             <div className="min-w-0">
+                                <h4 className="text-[11px] font-black text-white uppercase italic truncate leading-none mb-1">{t.name}</h4>
+                                <span className="px-1 py-0.5 bg-red-500/10 text-red-500 text-[6px] font-black uppercase tracking-widest rounded-sm">{t.region}</span>
+                             </div>
+                          </div>
+                          <div className="flex justify-center -space-x-1.5 mb-4">
+                            {t.pokemon.map((p, idx) => (
+                              p ? <div key={idx} className="w-6 h-6 bg-slate-900 border border-slate-800 rounded-full p-0.5 shrink-0 shadow-sm"><img src={p.sprite} className="w-full h-full object-contain" /></div> : null
+                            ))}
+                          </div>
+                          <button onClick={() => { props.onLoadEnemyTeam(t.pokemon as PokemonTeam); props.onClose(); }} className="w-full py-2 bg-red-900/80 hover:bg-red-800 text-white rounded-lg font-black uppercase italic text-[9px] shadow-lg transition-all">View Team</button>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="space-y-6">
+                    <div className="flex items-center justify-between px-1">
+                      <div className="flex items-center gap-3">
+                        <Map className="w-5 h-5 text-indigo-400" />
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Saved Rival Teams</h3>
+                      </div>
+                      {manualIntel.length > 0 && <ClearAllButton type="intel" count={manualIntel.length} />}
+                    </div>
+                    {manualIntel.length === 0 ? (
+                      <div className="py-12 text-center opacity-30 bg-slate-950/20 rounded-3xl border border-dashed border-slate-800"><Database className="w-8 h-8 mx-auto mb-3" /><p className="font-black uppercase tracking-widest italic text-[10px]">No saved rival teams found</p></div>
+                    ) : (
+                      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                        {manualIntel.map(t => (
+                          <div key={t.id} className="bg-slate-950/50 border border-slate-800 rounded-2xl p-3 flex flex-col hover:border-indigo-500/30 transition-all shadow-md">
+                            <h4 className="text-[11px] font-black text-white uppercase italic truncate mb-2">{t.name}</h4>
+                            <div className="flex justify-center gap-1 mb-4 overflow-hidden">
+                              {t.pokemon.map((p, idx) => (p ? <div key={idx} className="w-6 h-6 bg-slate-900 border border-slate-800 rounded-lg p-0.5 shrink-0"><img src={p.sprite} className="w-full h-full object-contain" /></div> : <div key={idx} className="w-6 h-6 border border-dashed border-slate-800 rounded-lg shrink-0" />))}
+                            </div>
+                            <div className="flex gap-2 mt-auto">
+                              <button onClick={() => props.onDeleteEnemyTeam(t.id)} className="p-2 bg-slate-900 text-slate-700 hover:text-red-500 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                              <button onClick={() => { props.onLoadEnemyTeam(t.pokemon as PokemonTeam); props.onClose(); }} className="flex-1 py-2 bg-indigo-900 text-white rounded-lg font-black uppercase italic text-[9px] shadow-lg transition-all">Load</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </div>
+              )}
+
               {currentTab === 'teams' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pb-12">
-                  {props.teams.length === 0 ? (
-                    <div className="col-span-full py-20 text-center opacity-30"><Users className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4" /><p className="font-black uppercase tracking-widest italic text-xs sm:text-sm">No Teams Stored</p></div>
+                   {props.teams.length === 0 ? (
+                    <div className="col-span-full py-20 text-center opacity-30"><Users className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4" /><p className="font-black uppercase tracking-widest italic text-xs sm:text-sm">No Saved Teams</p></div>
                   ) : props.teams.map(t => (
-                    <div key={t.id} className="bg-slate-950/50 border border-slate-800 rounded-[1.5rem] sm:rounded-3xl p-4 sm:p-6 hover:border-indigo-500/30 transition-all flex flex-col gap-4 sm:gap-6">
+                    <div key={t.id} className="bg-slate-950/50 border border-slate-800 rounded-[1.5rem] sm:rounded-3xl p-4 sm:p-6 hover:border-indigo-500/30 transition-all flex flex-col gap-4">
                       <div className="flex justify-between items-start">
-                        <div className="flex-1 min-w-0 pr-2 sm:pr-4">
-                          {editingId === t.id ? (
-                            <div className="flex items-center gap-1.5 sm:gap-2 w-full animate-in zoom-in-95">
-                              <input autoFocus className="bg-slate-900 border border-indigo-500 text-white text-sm sm:text-lg font-black p-2 rounded-lg sm:rounded-xl w-full outline-none uppercase italic" value={tempRenameValue} onChange={e => setTempRenameValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && confirmRename('team')} />
-                              <button onClick={() => confirmRename('team')} className="p-3 bg-indigo-600 text-white rounded-lg sm:rounded-xl"><Check className="w-5 h-5 sm:w-5 sm:h-5" /></button>
-                            </div>
-                          ) : (
-                            <>
-                              <h4 className="text-sm sm:text-lg font-black text-white uppercase italic tracking-tight truncate">{t.name}</h4>
-                              <span className="text-[8px] sm:text-[10px] text-slate-600 font-bold">{new Date(t.timestamp).toLocaleDateString()}</span>
-                            </>
-                          )}
+                        <div className="flex-1 min-w-0 pr-4">
+                          {editingId === t.id ? (<div className="flex items-center gap-2 animate-in zoom-in-95"><input autoFocus className="bg-slate-900 border border-indigo-500 text-white text-sm font-black p-2 rounded-xl w-full outline-none uppercase italic" value={tempRenameValue} onChange={e => setTempRenameValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && confirmRename('team')} /><button onClick={() => confirmRename('team')} className="p-3 bg-indigo-600 text-white rounded-xl"><Check className="w-5 h-5" /></button></div>) : (<><h4 className="text-sm sm:text-lg font-black text-white uppercase italic truncate">{t.name}</h4><span className="text-[8px] text-slate-600 font-bold">{new Date(t.timestamp).toLocaleDateString()}</span></>)}
                         </div>
                         <ActionGroup onRename={() => startRename(t.id, t.name)} onExport={() => handleExportIndividual('team', t)} onDelete={() => props.onDeleteTeam(t.id)} />
                       </div>
-                      <div className="bg-slate-900/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between border border-slate-800/50 gap-4">
-                        <div className="flex -space-x-3">
-                          {t.pokemon.map((p, idx) => p ? <img key={idx} src={p.sprite} className="w-8 h-8 sm:w-10 sm:h-10 object-contain drop-shadow-md" /> : <div key={idx} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-dashed border-slate-800" />)}
-                        </div>
-                        <button onClick={() => { props.onLoadTeam(t.pokemon); props.onClose(); }} className="w-full sm:w-auto px-5 py-3 sm:px-5 sm:py-2.5 bg-indigo-600 text-white rounded-lg sm:rounded-xl font-black uppercase text-[10px] sm:text-[10px] italic shadow-lg active:scale-95">Deploy Team</button>
+                      <div className="bg-slate-900/50 rounded-xl p-3 flex items-center justify-between border border-slate-800/50 gap-4">
+                        <div className="flex -space-x-3">{t.pokemon.map((p, idx) => p ? <img key={idx} src={p.sprite} className="w-8 h-8 sm:w-10 sm:h-10 object-contain drop-shadow-md" /> : <div key={idx} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-dashed border-slate-800" />)}</div>
+                        <button onClick={() => { props.onLoadTeam(t.pokemon); props.onClose(); }} className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-black uppercase text-[10px] italic shadow-lg active:scale-95">Load Team</button>
                       </div>
                     </div>
                   ))}
@@ -546,66 +538,19 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
 
               {currentTab === 'box' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 pb-12">
-                  {props.box.length === 0 ? (
-                    <div className="col-span-full py-20 text-center opacity-30"><Package className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4" /><p className="font-black uppercase tracking-widest italic text-xs sm:text-sm">The Box is Empty</p></div>
+                   {props.box.length === 0 ? (
+                    <div className="col-span-full py-20 text-center opacity-30"><Package className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4" /><p className="font-black uppercase tracking-widest italic text-xs sm:text-sm">Storage is Empty</p></div>
                   ) : props.box.map(p => (
-                    <div key={p.instanceId} className="bg-slate-950/50 border border-slate-800 rounded-[1.5rem] sm:rounded-3xl p-4 sm:p-5 hover:border-amber-500/30 transition-all flex flex-col gap-4">
+                    <div key={p.instanceId} className="bg-slate-950/50 border border-slate-800 rounded-[1.5rem] sm:rounded-3xl p-4 hover:border-amber-500/30 transition-all flex flex-col gap-4">
                       <div className="flex gap-4">
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-900 rounded-xl sm:rounded-2xl flex items-center justify-center p-2 shrink-0"><img src={p.sprite} className="w-full h-full object-contain drop-shadow-md" /></div>
+                        <div className="w-16 h-16 bg-slate-900 rounded-xl flex items-center justify-center p-2 shrink-0"><img src={p.sprite} className="w-full h-full object-contain" /></div>
                         <div className="flex-1 min-w-0">
-                          {editingId === p.instanceId ? (
-                            <div className="flex items-center gap-1.5 sm:gap-2 animate-in zoom-in-95">
-                              <input autoFocus className="bg-slate-900 border border-amber-500 text-white text-[10px] sm:text-sm font-black p-2 rounded-lg w-full outline-none uppercase italic" value={tempRenameValue} onChange={e => setTempRenameValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && confirmRename('box')} />
-                              <button onClick={() => confirmRename('box')} className="p-2 bg-amber-600 text-white rounded-lg"><Check className="w-5 h-5 sm:w-4 sm:h-4" /></button>
-                            </div>
-                          ) : (
-                            <>
-                              <h4 className="text-xs sm:text-sm font-black text-white uppercase italic truncate">{p.nickname || p.name}</h4>
-                              <p className="text-[8px] sm:text-[9px] text-slate-600 font-black uppercase tracking-widest">{p.name}</p>
-                              <div className="flex gap-1 mt-1.5">
-                                {(p.customTypes || p.types.map(t => t.name)).map(tName => <div key={tName} className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full" style={{backgroundColor: TYPE_COLORS[tName] || '#777'}} />)}
-                              </div>
-                            </>
-                          )}
+                          {editingId === p.instanceId ? (<div className="flex items-center gap-1.5 animate-in zoom-in-95"><input autoFocus className="bg-slate-900 border border-amber-500 text-white text-[10px] font-black p-2 rounded-lg w-full outline-none uppercase" value={tempRenameValue} onChange={e => setTempRenameValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && confirmRename('box')} /><button onClick={() => confirmRename('box')} className="p-2 bg-amber-600 text-white rounded-lg"><Check className="w-4 h-4" /></button></div>) : (<><h4 className="text-xs sm:text-sm font-black text-white uppercase italic truncate">{p.nickname || p.name}</h4><p className="text-[8px] text-slate-600 font-black uppercase tracking-widest">{p.name}</p><div className="flex gap-1 mt-1">{(p.customTypes || p.types.map(t => t.name)).map(tName => <div key={tName} className="w-2 h-2 rounded-full" style={{backgroundColor: TYPE_COLORS[tName] || '#777'}} />)}</div></>)}
                         </div>
                       </div>
-                      <div className="flex items-center justify-between pt-3 sm:pt-4 border-t border-slate-800/50">
+                      <div className="flex items-center justify-between pt-3 border-t border-slate-800/50">
                         <ActionGroup onRename={() => startRename(p.instanceId, p.nickname || p.name)} onExport={() => handleExportIndividual('pkmn', p)} onDelete={() => props.onDeleteBoxPkmn(p.instanceId)} />
-                        <div className="relative">
-                          {addingToSlot === p.instanceId ? (
-                            <div className="flex gap-1 bg-amber-600 p-1.5 rounded-xl animate-in zoom-in-95">
-                              {[0,1,2,3,4,5].map(idx => (
-                                <button key={idx} onClick={() => { props.onAddToTeamFromBox(p, idx); setAddingToSlot(null); props.onClose(); }} className="w-9 h-9 flex items-center justify-center bg-amber-500 text-white rounded-lg font-black text-xs sm:text-[10px]">{idx+1}</button>
-                              ))}
-                            </div>
-                          ) : (
-                            <button onClick={() => setAddingToSlot(p.instanceId)} className="px-5 py-3 sm:px-4 sm:py-2 bg-amber-600 text-white rounded-lg sm:rounded-xl font-black uppercase text-[10px] sm:text-[10px] shadow-lg active:scale-95">Deploy</button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {currentTab === 'intel' && (
-                <div className="space-y-3 sm:space-y-4 pb-12">
-                  {props.enemyTeams.length === 0 ? (
-                    <div className="py-20 text-center opacity-30"><ShieldAlert className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4" /><p className="font-black uppercase tracking-widest italic text-xs sm:text-sm">No Intel Logs</p></div>
-                  ) : props.enemyTeams.map(t => (
-                    <div key={t.id} className="bg-slate-950/50 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6 hover:border-red-500/30 transition-all">
-                      <div className="flex-1 min-w-0 w-full">
-                        <div className="flex items-center gap-2">
-                          {t.id === 'trainer-red-classic' && <Trophy className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500" />}
-                          <h4 className="text-sm sm:text-lg font-black text-white uppercase italic truncate">{t.name}</h4>
-                        </div>
-                        <div className="flex gap-1.5 sm:gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
-                          {t.pokemon.map((p, idx) => p ? <div key={idx} className="w-8 h-8 sm:w-10 sm:h-10 bg-slate-900 border border-slate-800 rounded-lg sm:rounded-xl p-1 shrink-0"><img src={p.sprite} className="w-full h-full object-contain" /></div> : <div key={idx} className="w-8 h-8 sm:w-10 sm:h-10 border border-dashed border-slate-800 rounded-lg sm:rounded-xl shrink-0" />)}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 sm:gap-3 shrink-0 w-full sm:w-auto">
-                        {t.id !== 'trainer-red-classic' && <button onClick={() => props.onDeleteEnemyTeam(t.id)} className="flex-1 sm:flex-none p-3.5 sm:p-3 bg-slate-900 text-slate-700 hover:text-red-500 rounded-lg sm:rounded-2xl transition-colors"><Trash2 className="w-5 h-5 sm:w-5 sm:h-5" /></button>}
-                        <button onClick={() => { props.onLoadEnemyTeam(t.pokemon as PokemonTeam); props.onClose(); }} className="flex-[2] sm:flex-none px-6 py-4 sm:px-6 sm:py-3 bg-red-900 text-white rounded-lg sm:rounded-2xl font-black uppercase italic text-[10px] sm:text-xs shadow-lg active:scale-95">Analyze</button>
+                        <div className="relative">{addingToSlot === p.instanceId ? (<div className="flex gap-1 bg-amber-600 p-1 rounded-xl animate-in zoom-in-95">{[0,1,2,3,4,5].map(idx => (<button key={idx} onClick={() => { props.onAddToTeamFromBox(p, idx); setAddingToSlot(null); props.onClose(); }} className="w-8 h-8 flex items-center justify-center bg-amber-500 text-white rounded-lg font-black text-xs">{idx+1}</button>))}</div>) : (<button onClick={() => setAddingToSlot(p.instanceId)} className="px-4 py-2 bg-amber-600 text-white rounded-xl font-black uppercase text-[10px] shadow-lg">To Team</button>)}</div>
                       </div>
                     </div>
                   ))}

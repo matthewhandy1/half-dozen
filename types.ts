@@ -68,6 +68,9 @@ export interface SavedEnemyTeam {
   name: string;
   pokemon: (Partial<PokemonData> | null)[];
   timestamp: number;
+  avatar?: string;
+  region?: string;
+  isLegacy?: boolean;
 }
 
 export interface UserProfile {

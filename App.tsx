@@ -8,11 +8,11 @@ import { VaultModal } from './components/VaultModal';
 import { InfoModal } from './components/InfoModal';
 import { EnemyTeamSection } from './components/EnemyTeamSection';
 import { PokemonData, PokemonTeam, BoxPokemon, SavedTeam, SavedEnemyTeam, UserProfile, MasterSyncPackage } from './types';
-import { fetchAllPokemonNames, fetchPokemon, fetchAllMoves, fetchAllItems, fetchPokemonBasic } from './services/pokeApi';
+import { fetchAllPokemonNames, fetchPokemon, fetchAllMoves, fetchAllItems, fetchPokemonBasic, fetchItemDescription, fetchMoveDetails } from './services/pokeApi';
 import { STAT_ABBREVIATIONS, GENERATIONS } from './constants';
-import { Trash2, Save, Check, BarChart3, LayoutGrid, Fingerprint, PackagePlus, X, User, Loader2, Info, Heart, Layers } from 'lucide-react';
+import { Trash2, Save, Check, BarChart3, LayoutGrid, Fingerprint, PackagePlus, X, User, Loader2, Info, Heart, Layers, HelpCircle, Download } from 'lucide-react';
 
-const APP_VERSION = "6.1.2";
+const APP_VERSION = "6.5.0";
 
 const PokeballIcon: React.FC<{ className?: string }> = ({ className }) => (
   <div className={`relative w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 border-slate-950 overflow-hidden shadow-sm ${className}`}>
@@ -41,18 +41,16 @@ const HeaderTrainerSprite: React.FC<{ name: string }> = ({ name }) => {
   );
 };
 
-// HELPER: Strip fat from Pokemon objects for storage
 const miniaturize = (p: PokemonData | null): PokemonData | null => {
   if (!p) return null;
   const { availableMoves, abilities, stats, ...essential } = p;
   return { 
     ...essential, 
-    stats: [], // Empty stats for storage
-    abilities: [] // Empty abilities for storage
+    stats: [], 
+    abilities: [] 
   } as PokemonData;
 };
 
-// HELPER: Compression/Decompression
 const compress = async (text: string) => {
   const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
   const compressedBlob = await new Response(stream).blob();
@@ -60,20 +58,38 @@ const compress = async (text: string) => {
   return new Promise<string>((resolve) => {
     reader.onload = () => {
       const base64 = (reader.result as string).split(',')[1];
-      resolve(`H6_${base64}`); // Header for versioning
+      resolve(`H6_${base64}`);
     };
     reader.readAsDataURL(compressedBlob);
   });
 };
 
 const decompress = async (encoded: string) => {
-  if (!encoded.startsWith('H6_')) throw new Error("Unsupported format");
+  if (!encoded.startsWith('H6_')) {
+    // Fallback for legacy raw base64
+    const jsonStr = decodeURIComponent(Array.prototype.map.call(atob(encoded.trim()), (c) => 
+      '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    ).join(''));
+    return JSON.parse(jsonStr);
+  }
   const base64 = encoded.slice(3);
   const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
   const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
   const decompressedText = await new Response(stream).text();
   return JSON.parse(decompressedText);
 };
+
+const CHAMPION_TEMPLATES = [
+  { id: 'red-classic', name: "Red", region: "Kanto", avatar: "red", pkmn: ['pikachu', 'lapras', 'snorlax', 'venusaur', 'charizard', 'blastoise'] },
+  { id: 'blue-classic', name: "Blue", region: "Kanto", avatar: "blue", pkmn: ['pidgeot', 'alakazam', 'rhydon', 'exeggutor', 'arcanine', 'blastoise'] },
+  { id: 'lance-classic', name: "Lance", region: "Johto", avatar: "lance", pkmn: ['gyarados', 'dragonite', 'dragonite', 'dragonite', 'aerodactyl', 'charizard'] },
+  { id: 'steven-classic', name: "Steven", region: "Hoenn", avatar: "steven", pkmn: ['skarmory', 'claydol', 'aggron', 'cradily', 'armaldo', 'metagross'] },
+  { id: 'cynthia-classic', name: "Cynthia", region: "Sinnoh", avatar: "cynthia", pkmn: ['spiritomb', 'roserade', 422, 'lucario', 'milotic', 'garchomp'] },
+  { id: 'alder-classic', name: "Alder", region: "Unova", avatar: "alder", pkmn: ['accelgor', 'bouffalant', 'druddigon', 'vanilluxe', 'escavalier', 'volcarona'] },
+  { id: 'diantha-classic', name: "Diantha", region: "Kalos", avatar: "diantha", pkmn: ['hawlucha', 'tyrantrum', 'aurorus', 711, 'goodra', 'gardevoir'] },
+  { id: 'leon-classic', name: "Leon", region: "Galar", avatar: "leon", pkmn: [681, 'dragapult', 'haxorus', 'seismitoad', 'rillaboom', 'charizard'] },
+  { id: 'geeta-classic', name: "Geeta", region: "Paldea", avatar: "geeta", pkmn: ['espathra', 'gogoat', 'veluza', 'avalugg', 'kingambit', 'glimmora'] }
+];
 
 const App: React.FC = () => {
   const [team, setTeam] = useState<PokemonTeam>([null, null, null, null, null, null]);
@@ -90,6 +106,10 @@ const App: React.FC = () => {
   
   const [vaultState, setVaultState] = useState<{ open: boolean, tab: 'profile' | 'teams' | 'box' | 'intel' }>({ open: false, tab: 'profile' });
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+
+  // Sharing handling state
+  const [pendingShare, setPendingShare] = useState<{ type: 'p' | 't', data: any } | null>(null);
+  const [isProcessingShare, setIsProcessingShare] = useState(false);
 
   const [profile, setProfile] = useState<UserProfile>(() => {
     try {
@@ -126,6 +146,80 @@ const App: React.FC = () => {
     } catch (e) { return []; }
   });
 
+  // Share detection logic
+  useEffect(() => {
+    const checkHash = async () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#share=')) {
+        const code = hash.substring(7);
+        try {
+          const payload = await decompress(code);
+          if (payload.v === 2) {
+            setPendingShare({ type: payload.t, data: payload.d });
+          }
+          // Clear hash without reload
+          window.history.replaceState(null, "", window.location.pathname);
+        } catch (e) {
+          console.error("Failed to parse shared item", e);
+        }
+      }
+    };
+    checkHash();
+  }, []);
+
+  const reconstructFromDNA = async (dna: any) => {
+    const base = await fetchPokemon(dna.id);
+    const itemDesc = dna.i ? await fetchItemDescription(dna.i) : '';
+    const reconstructedMoves = await Promise.all(
+      (dna.m || [null, null, null, null]).map(async (moveName: string | null) => {
+        if (!moveName) return { name: '', type: '', damageClass: '', power: null };
+        try {
+          const details = await fetchMoveDetails(moveName);
+          return { name: moveName, type: details.type, damageClass: details.damageClass, power: details.power };
+        } catch (e) {
+          return { name: moveName, type: '', damageClass: '', power: null };
+        }
+      })
+    );
+    return {
+      ...base,
+      nickname: dna.n || undefined,
+      selectedAbility: dna.a || base.selectedAbility,
+      selectedItem: dna.i || '',
+      selectedItemDescription: itemDesc,
+      selectedMoves: reconstructedMoves,
+      customTypes: dna.ct || undefined
+    };
+  };
+
+  const handleAcceptShare = async () => {
+    if (!pendingShare) return;
+    setIsProcessingShare(true);
+    try {
+      if (pendingShare.type === 't') {
+        const pData = await Promise.all(pendingShare.data.p.map((dna: any) => dna ? reconstructFromDNA(dna) : null));
+        const newTeam: SavedTeam = {
+          id: Date.now().toString(),
+          name: `Shared: ${pendingShare.data.n}`,
+          pokemon: pData as PokemonTeam,
+          timestamp: Date.now()
+        };
+        setTeams(prev => [newTeam, ...prev]);
+        setVaultState({ open: true, tab: 'teams' });
+      } else {
+        const pData = await reconstructFromDNA(pendingShare.data);
+        const newPkmn: BoxPokemon = { ...pData, instanceId: Date.now().toString() + Math.random().toString(36).substr(2, 5) };
+        setBox(prev => [newPkmn, ...prev]);
+        setVaultState({ open: true, tab: 'box' });
+      }
+    } catch (e) {
+      alert("Failed to load shared content.");
+    } finally {
+      setIsProcessingShare(false);
+      setPendingShare(null);
+    }
+  };
+
   useEffect(() => {
     const init = async () => {
       const [pList, mList, iList] = await Promise.all([
@@ -139,24 +233,42 @@ const App: React.FC = () => {
 
       try {
         if (!enemyTeam.some(p => p !== null)) {
-          const redNames = ['pikachu', 'lapras', 'snorlax', 'venusaur', 'charizard', 'blastoise'];
-          const redTeamData = await Promise.all(redNames.map(name => fetchPokemonBasic(name)));
-          setEnemyTeam(redTeamData as PokemonTeam);
-          if (enemyTeams.length === 0) {
-             setEnemyTeams([{
-               id: 'trainer-red-classic',
-               name: "Trainer Red",
-               pokemon: redTeamData.map(p => miniaturize(p)),
-               timestamp: Date.now()
-             }]);
-          }
+          const redTeamData = await Promise.all(
+            CHAMPION_TEMPLATES[0].pkmn.map(id => fetchPokemonBasic(id).catch(() => null))
+          );
+          setEnemyTeam(redTeamData.filter((p): p is PokemonData => p !== null) as PokemonTeam);
         }
-      } catch (err) {}
+
+        const hasBrokenLegacy = enemyTeams.some(t => t.isLegacy && t.pokemon.some(p => p === null));
+        
+        if (enemyTeams.length === 0 || hasBrokenLegacy) {
+          const dossiers = await Promise.all(CHAMPION_TEMPLATES.map(async (tmpl) => {
+             const pkmnData = await Promise.all(
+               tmpl.pkmn.map(id => fetchPokemonBasic(id).catch(() => null))
+             );
+             return {
+               id: `legacy-${tmpl.id}`,
+               name: tmpl.name,
+               region: tmpl.region,
+               avatar: tmpl.avatar,
+               isLegacy: true,
+               pokemon: pkmnData.map(p => p ? miniaturize(p) : null),
+               timestamp: Date.now()
+             };
+          }));
+
+          setEnemyTeams(prev => {
+            const manual = prev.filter(t => !t.isLegacy);
+            return [...dossiers, ...manual];
+          });
+        }
+      } catch (err) { 
+        console.error("Initial Seeding Error:", err); 
+      }
     };
     init();
   }, [selectedGen]);
 
-  // Hydrate pokemon data when it is loaded into the active slots
   const hydrateSlot = async (index: number, partialData: PokemonData) => {
     try {
       const full = await fetchPokemon(partialData.id);
@@ -217,7 +329,7 @@ const App: React.FC = () => {
     const newTeam = [...team];
     newTeam[slotIndex] = JSON.parse(JSON.stringify(pokemon));
     setTeam(newTeam);
-    hydrateSlot(slotIndex, pokemon); // Re-fetch the fat data (stats, moves)
+    hydrateSlot(slotIndex, pokemon);
   };
 
   const handleLoadTeam = (loadedTeam: PokemonTeam) => {
@@ -303,7 +415,6 @@ const App: React.FC = () => {
       if (decoded.teams) setTeams(decoded.teams);
       if (decoded.enemyTeams) setEnemyTeams(decoded.enemyTeams);
       
-      // Auto-hydrate the current team slots
       decoded.team.forEach((p, idx) => {
         if (p) hydrateSlot(idx, p);
       });
@@ -342,12 +453,11 @@ const App: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl sm:text-3xl font-black text-slate-100 tracking-tight leading-none mb-0.5 sm:mb-1 uppercase italic">Half Dozen</h1>
-              <p className="text-slate-600 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.3em] leading-none italic hidden sm:block">Pokemon Team Architect</p>
+              <p className="text-slate-600 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.3em] leading-none italic hidden sm:block">Pokemon Team Builder</p>
             </div>
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4 h-11 sm:h-14">
-            {/* Generation Selector */}
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl">
               <Layers className="w-3.5 h-3.5 text-indigo-400" />
               <select 
@@ -363,7 +473,6 @@ const App: React.FC = () => {
               </select>
             </div>
 
-            {/* Trainer Profile Button */}
             <div 
               className="h-11 w-11 sm:h-auto sm:w-auto flex items-center gap-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl sm:rounded-[1.25rem] transition-all group cursor-pointer overflow-hidden sm:px-4 sm:py-2" 
               onClick={() => setVaultState({ open: true, tab: 'profile' })}
@@ -377,22 +486,21 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Vault Button */}
             <button 
               onClick={() => setVaultState({ open: true, tab: 'teams' })}
               className="h-11 w-11 sm:h-14 sm:w-auto flex items-center justify-center gap-3 sm:px-6 bg-slate-800 hover:bg-slate-700 text-white rounded-xl sm:rounded-[1.25rem] border border-slate-700 transition-all group shadow-xl"
+              title="Vault & Saved Teams"
             >
               <Fingerprint className="w-5 h-5 sm:w-5 sm:h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
               <span className="text-xs uppercase italic font-black hidden sm:inline">The Vault</span>
             </button>
 
-            {/* Info Button */}
             <button 
               onClick={() => setIsInfoOpen(true)}
               className="h-11 w-11 sm:h-14 sm:w-14 flex items-center justify-center bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 rounded-xl sm:rounded-[1.25rem] transition-all group shadow-lg shadow-indigo-500/5"
-              title="Application Intel"
+              title="Help & App Guide"
             >
-              <Info className="w-5 h-5 sm:w-6 sm:h-6 group-hover:scale-110 transition-transform" />
+              <HelpCircle className="w-5 h-5 sm:w-6 sm:h-6 group-hover:scale-110 transition-transform" />
             </button>
           </div>
         </div>
@@ -407,7 +515,6 @@ const App: React.FC = () => {
                 <h2 className="text-xl sm:text-2xl font-black text-white uppercase italic tracking-tight">Active Team</h2>
               </div>
 
-              {/* Mobile Gen Selector */}
               <div className="md:hidden flex items-center gap-2 px-3 py-1 bg-slate-900 border border-slate-800 rounded-lg">
                 <Layers className="w-3 h-3 text-indigo-400" />
                 <select 
@@ -434,7 +541,7 @@ const App: React.FC = () => {
                   }`}
                 >
                   {showBulkStashFeedback ? <Check className="w-3.5 h-3.5" /> : <PackagePlus className="w-3.5 h-3.5" />}
-                  <span className="hidden sm:inline">{showBulkStashFeedback ? 'Stashed' : 'Stash All'}</span>
+                  <span className="hidden sm:inline">{showBulkStashFeedback ? 'Added' : 'Save All to Box'}</span>
                 </button>
 
                 <div className="h-6 w-px bg-slate-800 mx-1 hidden sm:block" />
@@ -445,7 +552,7 @@ const App: React.FC = () => {
                   className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-bold transition-all border shadow-lg ${showSavedFeedback ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-indigo-600 border-indigo-500 text-white hover:bg-indigo-500'} disabled:opacity-30`}
                 >
                   {showSavedFeedback ? <Check className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
-                  <span className="text-[10px] uppercase italic font-black">{showSavedFeedback ? 'Saved' : 'Save Team'}</span>
+                  <span className="text-[10px] uppercase italic font-black">{showSavedFeedback ? 'Saved' : 'Save Full Team'}</span>
                 </button>
 
                 <button 
@@ -517,7 +624,7 @@ const App: React.FC = () => {
             src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/598.png" 
             alt="Ferrothorn" 
             className="w-10 h-10 object-contain hover:grayscale-0 transition-all cursor-help drop-shadow-[0_0_8px_rgba(100,116,139,0.3)]"
-            title="Iron Defense Enabled"
+            title="Iron Defense"
           />
           <p className="text-[11px] font-black uppercase tracking-[0.2em] italic text-slate-300">
             © {currentYear} Half Dozen <span className="ml-2 opacity-40 font-mono text-[9px] lowercase tracking-normal">v{APP_VERSION}</span>
@@ -538,6 +645,37 @@ const App: React.FC = () => {
         </button>
       </div>
 
+      {pendingShare && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-950/95 backdrop-blur-2xl animate-in fade-in duration-300">
+          <div className="bg-slate-900 border border-slate-700 rounded-[2.5rem] p-8 sm:p-12 w-full max-w-xl shadow-2xl text-center animate-in zoom-in-95 duration-500">
+            <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center text-white mx-auto mb-8 shadow-2xl">
+              <Download className={`w-10 h-10 ${isProcessingShare ? 'animate-bounce' : ''}`} />
+            </div>
+            <h2 className="text-3xl font-black text-white uppercase italic tracking-tight mb-4 leading-none">Shared Item Detected</h2>
+            <p className="text-slate-500 text-sm font-bold uppercase tracking-widest mb-10 leading-relaxed italic">
+              Someone shared {pendingShare.type === 't' ? 'a full team' : 'a unique Pokémon build'} with you. Would you like to load it into your Vault?
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button 
+                onClick={handleAcceptShare}
+                disabled={isProcessingShare}
+                className="flex-1 py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase text-sm shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3"
+              >
+                {isProcessingShare ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+                Load to Vault
+              </button>
+              <button 
+                onClick={() => setPendingShare(null)}
+                disabled={isProcessingShare}
+                className="flex-1 py-5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-2xl font-black uppercase text-sm active:scale-95 transition-all"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isNamingTeam && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95">
@@ -553,7 +691,7 @@ const App: React.FC = () => {
               onKeyDown={e => e.key === 'Enter' && handleConfirmSaveTeam()}
              />
              <div className="flex gap-3">
-               <button onClick={handleConfirmSaveTeam} className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase text-sm shadow-xl hover:bg-indigo-500 transition-all">Confirm Save</button>
+               <button onClick={handleConfirmSaveTeam} className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase text-sm shadow-xl hover:bg-indigo-500 transition-all">Save Team</button>
              </div>
           </div>
         </div>
