@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PokemonData, MoveDetails, SelectedMove } from '../types';
 import { POKEMON_TYPES, TYPE_COLORS } from '../constants';
-import { Search, X, Edit3, Disc, Check, Settings2, Zap, ShieldCheck, Trash2, PackagePlus, Info, Fingerprint } from 'lucide-react';
+import { Search, X, Edit3, Disc, Check, Settings2, Zap, ShieldCheck, Trash2, PackagePlus, Info, Fingerprint, Save } from 'lucide-react';
 import { fetchPokemon, fetchMoveDetails } from '../services/pokeApi';
 import { ControlTooltip, AbilityTooltip } from './PokemonSharedUI';
 import { MoveSearchSelector } from './PokemonSelectors';
@@ -32,7 +32,6 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [isArchitectOpen, setIsArchitectOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [tempNickname, setTempNickname] = useState('');
   
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -112,8 +111,11 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({
     onSelect(index, { ...pokemon, customTypes: updated });
   };
 
-  const handleSaveNickname = () => {
-    if (pokemon) onSelect(index, { ...pokemon, nickname: tempNickname });
+  const openArchitect = () => {
+    if (pokemon) {
+      setTempNickname(pokemon.nickname || '');
+      setIsArchitectOpen(true);
+    }
   };
 
   const cardBackgroundStyle = pokemon ? {
@@ -122,10 +124,6 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({
       : `linear-gradient(135deg, #ffffff05, #ffffff15)`,
     borderColor: pokemon.dominantColors ? `${pokemon.dominantColors[0]}40` : `#ffffff15`
   } : {};
-
-  const influentialAbilities = pokemon?.abilities.filter(a => 
-    INFLUENTIAL_ABILITIES.includes(a.name.toLowerCase())
-  ) || [];
 
   const movesPool = pokemon?.availableMoves ?? [];
 
@@ -146,11 +144,11 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col relative p-4 gap-1 h-full cursor-pointer lg:cursor-default items-center" onClick={() => { if(window.innerWidth < 1024) { setTempNickname(pokemon.nickname || ''); setIsArchitectOpen(true); } }}>
+            <div className="flex-1 flex flex-col relative p-4 gap-1 h-full cursor-pointer lg:cursor-default items-center" onClick={() => { if(window.innerWidth < 1024) openArchitect(); }}>
               <div className="hidden lg:flex absolute top-4 left-4 z-20 gap-2">
                 <div className="relative group">
-                  <button onClick={(e) => { e.stopPropagation(); setTempNickname(pokemon.nickname || pokemon.name); setIsEditing(!isEditing); }} className={`p-2 rounded-xl transition-all ${isEditing ? 'text-indigo-400 bg-indigo-500/10' : 'bg-slate-800/60 text-slate-400 hover:text-white'}`}><Edit3 className="w-3.5 h-3.5" /></button>
-                  <ControlTooltip text="Set Nickname" />
+                  <button onClick={(e) => { e.stopPropagation(); openArchitect(); }} className="p-2 rounded-xl transition-all bg-slate-800/60 text-slate-400 hover:text-white hover:bg-indigo-600/40"><Edit3 className="w-3.5 h-3.5" /></button>
+                  <ControlTooltip text="Edit Pokemon" />
                 </div>
                 <div className="relative group">
                   <button onClick={(e) => { e.stopPropagation(); handleSaveInstance(); }} className={`p-2 rounded-xl transition-all ${saving ? 'bg-emerald-600 text-white' : 'bg-slate-800/60 text-slate-400 hover:text-white'}`}>{saving ? <Check className="w-3.5 h-3.5" /> : <Disc className="w-3.5 h-3.5" />}</button>
@@ -163,33 +161,24 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({
                 <img src={pokemon.sprite} alt={pokemon.name} className="w-full h-full object-contain drop-shadow-2xl" />
               </div>
 
-              {!isEditing && (
-                <div className="text-center w-full">
-                  <h3 className="text-[11px] sm:text-sm font-black text-slate-100 uppercase italic truncate tracking-tight mb-1">{pokemon.nickname || pokemon.name}</h3>
-                  <div className="flex flex-wrap gap-1 items-center justify-center">
-                    {(pokemon.customTypes || pokemon.types.map(t => t.name)).map((tName, i) => (
-                      <span key={i} className="inline-flex items-center justify-center w-14 h-3.5 sm:h-4 rounded-md text-[7px] sm:text-[8px] font-black uppercase tracking-widest text-white ring-1 ring-white/10" style={{ backgroundColor: TYPE_COLORS[tName] }}>{tName}</span>
-                    ))}
-                  </div>
+              <div className="text-center w-full">
+                <h3 className="text-[11px] sm:text-sm font-black text-slate-100 uppercase italic truncate tracking-tight mb-1">{pokemon.nickname || pokemon.name}</h3>
+                <div className="flex flex-wrap gap-1 items-center justify-center">
+                  {(pokemon.customTypes || pokemon.types.map(t => t.name)).map((tName, i) => (
+                    <span key={i} className="inline-flex items-center justify-center w-14 h-3.5 sm:h-4 rounded-md text-[7px] sm:text-[8px] font-black uppercase tracking-widest text-white ring-1 ring-white/10" style={{ backgroundColor: TYPE_COLORS[tName] }}>{tName}</span>
+                  ))}
                 </div>
-              )}
+              </div>
 
               <div className="flex-1 flex flex-col w-full mt-2">
-                {isEditing ? (
-                  <div className="flex flex-col gap-2 animate-in slide-in-from-top-1 px-1" onClick={e => e.stopPropagation()}>
-                    <input autoFocus className="w-full bg-slate-950 border border-slate-800 text-[10px] font-black text-white py-2 px-3 rounded-xl outline-none uppercase" value={tempNickname} onChange={e => setTempNickname(e.target.value)} onBlur={handleSaveNickname} />
-                    <button onClick={() => setIsEditing(false)} className="w-full py-2 bg-indigo-600 text-white text-[9px] font-black uppercase italic rounded-xl">Confirm</button>
+                <div className="flex flex-col gap-1 pt-3 border-t border-slate-800/40 w-full">
+                  <div className="hidden lg:grid grid-cols-1 gap-1">
+                    {[0, 1, 2, 3].map(i => (<MoveSearchSelector key={i} selectedMove={pokemon.selectedMoves[i]} onChange={(val) => handleMoveChange(i, val)} placeholder={`Move ${i+1}`} options={movesPool} globalOptions={allMovesList} openUpwards={i > 1} />))}
                   </div>
-                ) : (
-                  <div className="flex flex-col gap-1 pt-3 border-t border-slate-800/40 w-full">
-                    <div className="hidden lg:grid grid-cols-1 gap-1">
-                      {[0, 1, 2, 3].map(i => (<MoveSearchSelector key={i} selectedMove={pokemon.selectedMoves[i]} onChange={(val) => handleMoveChange(i, val)} placeholder={`Move ${i+1}`} options={movesPool} globalOptions={allMovesList} openUpwards={i > 1} />))}
-                    </div>
-                    <div className="lg:hidden flex flex-col items-center gap-1 w-full opacity-50">
-                      <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Tap to Configure</p>
-                    </div>
+                  <div className="lg:hidden flex flex-col items-center gap-1 w-full opacity-50">
+                    <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Tap to Configure</p>
                   </div>
-                )}
+                </div>
               </div>
             </div>
           )}
@@ -206,19 +195,22 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({
                 <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">Configure Pokemon</p>
               </div>
             </div>
-            <button onClick={() => setIsArchitectOpen(false)} className="p-3 text-slate-500"><X className="w-8 h-8" /></button>
+            <button onClick={() => setIsArchitectOpen(false)} className="p-3 text-slate-500 hover:text-white transition-colors"><X className="w-8 h-8" /></button>
           </div>
-          <div className="flex-1 overflow-y-auto p-6 space-y-8 max-w-4xl mx-auto w-full pb-32">
+          <div className="flex-1 overflow-y-auto p-6 space-y-8 max-w-4xl mx-auto w-full pb-48 scrollbar-thin">
             <section className="bg-slate-900/40 rounded-[2rem] p-6 border border-slate-800/50">
               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2"><Fingerprint className="w-4 h-4 text-indigo-400" /> Nickname & Types</h3>
               <div className="space-y-4">
-                <input className="w-full bg-slate-900 border border-slate-800 text-lg font-black text-white p-5 rounded-2xl outline-none uppercase italic" value={tempNickname} placeholder="Set nickname..." onChange={e => { setTempNickname(e.target.value); onSelect(index, { ...pokemon, nickname: e.target.value }); }} />
+                <input autoFocus className="w-full bg-slate-900 border border-slate-800 text-lg font-black text-white p-5 rounded-2xl outline-none uppercase italic focus:ring-2 focus:ring-indigo-500/50" value={tempNickname} placeholder="Set nickname..." onChange={e => { setTempNickname(e.target.value); onSelect(index, { ...pokemon, nickname: e.target.value }); }} />
                 <div className="grid grid-cols-2 gap-4">
                   {[0, 1].map(i => (
-                    <select key={i} className="w-full bg-slate-900 text-xs font-bold uppercase rounded-2xl p-4 border border-slate-800 text-slate-300" value={(pokemon.customTypes || pokemon.types.map(t => t.name))[i] || 'none'} onChange={(e) => handleTypeChange(i, e.target.value)}>
-                      <option value="none">None</option>
-                      {POKEMON_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
+                    <div key={i} className="flex flex-col gap-2">
+                      <label className="text-[8px] font-black text-slate-600 uppercase tracking-widest ml-1">{i === 0 ? 'Primary' : 'Secondary'} Type</label>
+                      <select className="w-full bg-slate-900 text-xs font-bold uppercase rounded-2xl p-4 border border-slate-800 text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/30 appearance-none" value={(pokemon.customTypes || pokemon.types.map(t => t.name))[i] || 'none'} onChange={(e) => handleTypeChange(i, e.target.value)}>
+                        <option value="none">None</option>
+                        {POKEMON_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -246,9 +238,15 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({
               </div>
             </section>
           </div>
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800 flex gap-3 z-50">
-            <button onClick={handleSaveInstance} className={`flex-1 py-5 rounded-2xl font-black uppercase text-xs transition-all ${saving ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white shadow-lg'}`}>{saving ? 'Saved to Box' : 'Save to Box'}</button>
-            <button onClick={() => { onSelect(index, null); setIsArchitectOpen(false); }} className="flex-1 py-5 bg-slate-800 text-slate-400 hover:text-red-400 rounded-2xl font-black uppercase text-xs border border-slate-700">Remove Pokemon</button>
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800 flex flex-col gap-3 z-50">
+            <button onClick={handleSaveInstance} className={`w-full py-5 rounded-2xl font-black uppercase text-xs transition-all flex items-center justify-center gap-2 shadow-lg ${saving ? 'bg-emerald-600 text-white' : 'bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border border-emerald-500/20'}`}>
+              {saving ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+              {saving ? 'Saved to Box' : 'Save to Box'}
+            </button>
+            <div className="flex gap-3 w-full">
+              <button onClick={() => setIsArchitectOpen(false)} className="flex-1 py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase text-xs shadow-lg transition-all active:scale-95">Apply & Close</button>
+              <button onClick={() => { onSelect(index, null); setIsArchitectOpen(false); }} className="flex-1 py-5 bg-slate-800 text-slate-400 hover:text-red-400 rounded-2xl font-black uppercase text-xs border border-slate-700">Remove Pokemon</button>
+            </div>
           </div>
         </div>
       )}
