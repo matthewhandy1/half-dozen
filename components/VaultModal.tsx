@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { TYPE_COLORS } from '../constants';
 import { fetchPokemon, fetchMoveDetails, fetchItemDescription, fetchPokemonBasic } from '../services/pokeApi';
+import { KANTO_RIVALS, hydrateRivalTeam, RivalTeam } from '../rivalData';
+import { TrainerSprite } from './PokemonSharedUI';
 
 interface VaultModalProps {
   activeTab: 'profile' | 'teams' | 'box' | 'intel';
@@ -30,7 +32,7 @@ interface VaultModalProps {
   onAddBoxPkmn: (pokemon: BoxPokemon) => void;
   onClearAllBox: () => void;
   onDeleteEnemyTeam: (id: string) => void;
-  onLoadEnemyTeam: (team: PokemonTeam) => void;
+  onLoadEnemyTeam: (team: PokemonTeam, metadata?: { name: string; avatar: string }) => void;
   onClearAllEnemyTeams: () => void;
   onExportMasterKey: () => Promise<string>;
   onImportMasterKey: (key: string) => Promise<void>;
@@ -55,26 +57,6 @@ const TRAINER_AVATARS = [
   { id: 'hexmaniac', name: "Hex Maniac" }, { id: 'youngster', name: "Youngster" },
   { id: 'hiker', name: "Hiker" }, { id: 'beauty', name: "Beauty" }, { id: 'psychic', name: "Psychic" }
 ];
-
-const TrainerSprite: React.FC<{ id: string; name?: string; className?: string }> = ({ id, name, className = "" }) => {
-  const [status, setStatus] = useState<'loading' | 'error' | 'success'>('loading');
-  const spriteUrl = `https://play.pokemonshowdown.com/sprites/trainers/${id}.png`;
-
-  return (
-    <div className={`relative flex items-center justify-center overflow-hidden bg-slate-900/50 ${className}`}>
-      {status === 'loading' && <Loader2 className="absolute w-6 h-6 animate-spin text-slate-700" />}
-      {status === 'error' && <User className="w-1/2 h-1/2 text-slate-700" />}
-      <img 
-        src={spriteUrl} 
-        alt={name || "Trainer"} 
-        className={`${status === 'success' ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300 object-contain w-full h-full`}
-        onLoad={() => setStatus('success')}
-        onError={() => setStatus('error')}
-        title={name}
-      />
-    </div>
-  );
-};
 
 const compressHelper = async (text: string) => {
   const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
@@ -122,6 +104,7 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
   const [exchangeCode, setExchangeCode] = useState('');
   const [exchangeFeedback, setExchangeFeedback] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [intelCategory, setIntelCategory] = useState<'gym' | 'elite' | 'champion' | 'rival'>('gym');
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: Fingerprint, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
@@ -173,6 +156,19 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
     setConfirmClearType(null);
     setExchangeFeedback("Deleted All Items");
     setTimeout(() => setExchangeFeedback(null), 2000);
+  };
+
+  const handleLoadRival = async (rival: RivalTeam) => {
+    setIsProcessing(true);
+    try {
+      const team = await hydrateRivalTeam(rival);
+      props.onLoadEnemyTeam(team, { name: rival.name, avatar: rival.avatar });
+      props.onClose();
+    } catch (e) {
+      alert("Failed to load rival team.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const serializePkmnDNA = (p: PokemonData) => ({
@@ -457,61 +453,83 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
 
               {currentTab === 'intel' && (
                 <div className="space-y-12 pb-20">
-                  <section className="space-y-6">
-                    <div className="flex items-center gap-3 px-1">
-                      <Trophy className="w-5 h-5 text-red-500" />
-                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Classic Champions</h3>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                      {legacyIntel.map(t => (
-                        <div key={t.id} className="bg-slate-950/50 border border-slate-800 rounded-2xl p-3 flex flex-col hover:border-red-500/30 transition-all group/intel shadow-md relative overflow-hidden">
-                          <div className="flex items-center gap-3 mb-3">
-                             <div className="w-10 h-10 bg-slate-900 rounded-lg overflow-hidden border border-slate-800 shrink-0">
-                                <TrainerSprite id={t.avatar || 'red'} className="w-full h-full scale-125 translate-y-1" />
-                             </div>
-                             <div className="min-w-0">
-                                <h4 className="text-[11px] font-black text-white uppercase italic truncate leading-none mb-1">{t.name}</h4>
-                                <span className="px-1 py-0.5 bg-red-500/10 text-red-500 text-[6px] font-black uppercase tracking-widest rounded-sm">{t.region}</span>
-                             </div>
-                          </div>
-                          <div className="flex justify-center -space-x-1.5 mb-4">
-                            {t.pokemon.map((p, idx) => (
-                              p ? <div key={idx} className="w-6 h-6 bg-slate-900 border border-slate-800 rounded-full p-0.5 shrink-0 shadow-sm"><img src={p.sprite} className="w-full h-full object-contain" /></div> : null
-                            ))}
-                          </div>
-                          <button onClick={() => { props.onLoadEnemyTeam(t.pokemon as PokemonTeam); props.onClose(); }} className="w-full py-2 bg-red-900/80 hover:bg-red-800 text-white rounded-lg font-black uppercase italic text-[9px] shadow-lg transition-all">View Team</button>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
+                  <div className="flex flex-wrap gap-2 p-1 bg-slate-950/50 rounded-2xl border border-slate-800/50">
+                    {[
+                      { id: 'gym', label: 'Gym Leaders', icon: Trophy },
+                      { id: 'elite', label: 'Elite Four', icon: BadgeCheck },
+                      { id: 'champion', label: 'Champions', icon: Zap },
+                      { id: 'rival', label: 'Saved Rivals', icon: Map }
+                    ].map(cat => (
+                      <button 
+                        key={cat.id} 
+                        onClick={() => setIntelCategory(cat.id as any)}
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-black uppercase text-[10px] transition-all ${intelCategory === cat.id ? 'bg-red-600 text-white shadow-lg shadow-red-900/20' : 'text-slate-500 hover:bg-slate-800'}`}
+                      >
+                        <cat.icon className="w-4 h-4" />
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
 
-                  <section className="space-y-6">
-                    <div className="flex items-center justify-between px-1">
-                      <div className="flex items-center gap-3">
-                        <Map className="w-5 h-5 text-indigo-400" />
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Saved Rival Teams</h3>
+                  {intelCategory !== 'rival' ? (
+                    <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex items-center gap-3 px-1">
+                        <Trophy className="w-5 h-5 text-red-500" />
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Kanto Region</h3>
                       </div>
-                      {manualIntel.length > 0 && <ClearAllButton type="intel" count={manualIntel.length} />}
-                    </div>
-                    {manualIntel.length === 0 ? (
-                      <div className="py-12 text-center opacity-30 bg-slate-950/20 rounded-3xl border border-dashed border-slate-800"><Database className="w-8 h-8 mx-auto mb-3" /><p className="font-black uppercase tracking-widest italic text-[10px]">No saved rival teams found</p></div>
-                    ) : (
                       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                        {manualIntel.map(t => (
-                          <div key={t.id} className="bg-slate-950/50 border border-slate-800 rounded-2xl p-3 flex flex-col hover:border-indigo-500/30 transition-all shadow-md">
-                            <h4 className="text-[11px] font-black text-white uppercase italic truncate mb-2">{t.name}</h4>
-                            <div className="flex justify-center gap-1 mb-4 overflow-hidden">
-                              {t.pokemon.map((p, idx) => (p ? <div key={idx} className="w-6 h-6 bg-slate-900 border border-slate-800 rounded-lg p-0.5 shrink-0"><img src={p.sprite} className="w-full h-full object-contain" /></div> : <div key={idx} className="w-6 h-6 border border-dashed border-slate-800 rounded-lg shrink-0" />))}
+                        {KANTO_RIVALS.filter(r => r.category === intelCategory).map(t => (
+                          <div key={t.id} className="bg-slate-950/50 border border-slate-800 rounded-2xl p-3 flex flex-col hover:border-red-500/30 transition-all group/intel shadow-md relative overflow-hidden">
+                            <div className="flex items-center gap-3 mb-3">
+                               <div className="w-10 h-10 bg-slate-900 rounded-lg overflow-hidden border border-slate-800 shrink-0">
+                                  <TrainerSprite id={t.avatar} className="w-full h-full scale-125 translate-y-1" />
+                               </div>
+                               <div className="min-w-0">
+                                  <h4 className="text-[11px] font-black text-white uppercase italic truncate leading-none mb-1">{t.name}</h4>
+                                  <span className="px-1 py-0.5 bg-red-500/10 text-red-500 text-[6px] font-black uppercase tracking-widest rounded-sm">{t.region}</span>
+                               </div>
                             </div>
-                            <div className="flex gap-2 mt-auto">
-                              <button onClick={() => props.onDeleteEnemyTeam(t.id)} className="p-2 bg-slate-900 text-slate-700 hover:text-red-500 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                              <button onClick={() => { props.onLoadEnemyTeam(t.pokemon as PokemonTeam); props.onClose(); }} className="flex-1 py-2 bg-indigo-900 text-white rounded-lg font-black uppercase italic text-[9px] shadow-lg transition-all">Load</button>
+                            <div className="flex justify-center gap-1 mb-4">
+                              {t.pokemon.map((pId, idx) => (
+                                <div key={idx} className="w-6 h-6 bg-slate-900 border border-slate-800 rounded-full p-0.5 shrink-0 shadow-sm flex items-center justify-center">
+                                  <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pId}.png`} className="w-full h-full object-contain" />
+                                </div>
+                              ))}
                             </div>
+                            <button onClick={() => handleLoadRival(t)} className="w-full py-2 bg-red-900/80 hover:bg-red-800 text-white rounded-lg font-black uppercase italic text-[9px] shadow-lg transition-all">Scout Team</button>
                           </div>
                         ))}
                       </div>
-                    )}
-                  </section>
+                    </section>
+                  ) : (
+                    <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-3">
+                          <Map className="w-5 h-5 text-indigo-400" />
+                          <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Saved Rival Teams</h3>
+                        </div>
+                        {manualIntel.length > 0 && <ClearAllButton type="intel" count={manualIntel.length} />}
+                      </div>
+                      {manualIntel.length === 0 ? (
+                        <div className="py-12 text-center opacity-30 bg-slate-950/20 rounded-3xl border border-dashed border-slate-800"><Database className="w-8 h-8 mx-auto mb-3" /><p className="font-black uppercase tracking-widest italic text-[10px]">No saved rival teams found</p></div>
+                      ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                          {manualIntel.map(t => (
+                            <div key={t.id} className="bg-slate-950/50 border border-slate-800 rounded-2xl p-3 flex flex-col hover:border-indigo-500/30 transition-all shadow-md">
+                              <h4 className="text-[11px] font-black text-white uppercase italic truncate mb-2">{t.name}</h4>
+                              <div className="flex justify-center gap-1 mb-4 overflow-hidden">
+                                {t.pokemon.map((p, idx) => (p ? <div key={idx} className="w-6 h-6 bg-slate-900 border border-slate-800 rounded-lg p-0.5 shrink-0"><img src={p.sprite} className="w-full h-full object-contain" /></div> : <div key={idx} className="w-6 h-6 border border-dashed border-slate-800 rounded-lg shrink-0" />))}
+                              </div>
+                              <div className="flex gap-2 mt-auto">
+                                <button onClick={() => props.onDeleteEnemyTeam(t.id)} className="p-2 bg-slate-900 text-slate-700 hover:text-red-500 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                <button onClick={() => { props.onLoadEnemyTeam(t.pokemon as PokemonTeam, { name: t.name, avatar: t.avatar || 'red' }); props.onClose(); }} className="flex-1 py-2 bg-indigo-900 text-white rounded-lg font-black uppercase italic text-[9px] shadow-lg transition-all">Load</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  )}
                 </div>
               )}
 

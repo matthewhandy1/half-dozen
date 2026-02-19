@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PokemonData, MoveDetails, SelectedMove } from '../types';
 import { POKEMON_TYPES, TYPE_COLORS } from '../constants';
-import { Search, X, Edit3, Disc, Check, Settings2, Zap, ShieldCheck, Trash2, PackagePlus, Info, Fingerprint, Save } from 'lucide-react';
+import { Search, X, Edit3, Disc, Check, Settings2, Zap, ShieldCheck, Trash2, PackagePlus, Info, Fingerprint, Save, Loader2 } from 'lucide-react';
 import { fetchPokemon, fetchMoveDetails } from '../services/pokeApi';
 import { ControlTooltip, AbilityTooltip } from './PokemonSharedUI';
 import { MoveSearchSelector } from './PokemonSelectors';

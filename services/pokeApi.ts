@@ -3,6 +3,45 @@ import { PokemonData, MoveDetails, SelectedMove, PokemonAbility } from '../types
 import { TYPE_COLORS, SPECIES_COLORS, GENERATIONS } from '../constants';
 
 /**
+ * Formats a PokeAPI slug into a human-readable name, preserving dashes where appropriate.
+ */
+function formatName(slug: string): string {
+  if (!slug) return '';
+
+  // Pokemon with official dashes
+  const dashPokemon = ['ho-oh', 'porygon-z', 'hakamo-o', 'jangmo-o', 'kommo-o', 'chi-yu', 'chien-pao', 'ting-lu', 'wo-chien'];
+  if (dashPokemon.includes(slug)) {
+    return slug.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('-');
+  }
+
+  // Moves with official dashes
+  const dashMoves: Record<string, string> = {
+    'u-turn': 'U-Turn',
+    'v-create': 'V-Create',
+    'x-scissor': 'X-Scissor',
+    'freeze-dry': 'Freeze-Dry',
+    'self-destruct': 'Self-Destruct',
+    'soft-boiled': 'Soft-Boiled',
+    'double-edge': 'Double-Edge',
+    'multi-attack': 'Multi-Attack',
+    'baby-doll-eyes': 'Baby-Doll Eyes',
+    'wake-up-slap': 'Wake-Up Slap',
+    'power-up-punch': 'Power-Up Punch',
+    'all-out-pummeling': 'All-Out Pummeling',
+    'trick-or-treat': 'Trick-or-Treat',
+    'topsy-turvy': 'Topsy-Turvy'
+  };
+
+  if (dashMoves[slug]) return dashMoves[slug];
+  if (slug.match(/^[uvx]-/i)) {
+    return slug.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('-');
+  }
+
+  // Default: space separated
+  return slug.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+}
+
+/**
  * Extracts dominant colors from an image URL using a hidden canvas.
  */
 async function getDominantColors(imageUrl: string): Promise<string[]> {
@@ -102,7 +141,7 @@ export async function fetchPokemon(identifier: string | number): Promise<Pokemon
 
   return {
     id: data.id,
-    name: data.name.split('-').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
+    name: formatName(data.name),
     sprite: spriteUrl,
     types: data.types.map((t: any) => ({
       name: t.type.name,
@@ -113,9 +152,7 @@ export async function fetchPokemon(identifier: string | number): Promise<Pokemon
       value: s.base_stat,
     })),
     abilities: abilities,
-    availableMoves: data.moves.map((m: any) => 
-      m.move.name.split('-').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ')
-    ).sort(),
+    availableMoves: data.moves.map((m: any) => formatName(m.move.name)).sort(),
     selectedMoves: Array.from({ length: 4 }, () => ({ name: '', type: '', damageClass: '', power: null })),
     selectedAbility: abilities[0]?.name,
     selectedNature: '',
@@ -149,7 +186,7 @@ export async function fetchPokemonBasic(identifier: string | number): Promise<Po
 
   return {
     id: data.id,
-    name: data.name.split('-').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
+    name: formatName(data.name),
     sprite: spriteUrl,
     types: data.types.map((t: any) => ({
       name: t.type.name,
@@ -175,7 +212,7 @@ export async function fetchAllPokemonNames(genId: number = 9): Promise<{ name: s
   return data.results.map((r: any) => {
     const id = parseInt(r.url.split('/').filter(Boolean).pop() || '0');
     return {
-      name: r.name.split('-').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
+      name: formatName(r.name),
       id: id, 
     };
   }).filter((p: any) => {
@@ -194,9 +231,7 @@ export async function fetchAllPokemonNames(genId: number = 9): Promise<{ name: s
 export async function fetchAllMoves(): Promise<string[]> {
   const response = await fetch('https://pokeapi.co/api/v2/move?limit=1500');
   const data = await response.json();
-  return data.results.map((r: any) => 
-    r.name.split('-').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ')
-  ).sort();
+  return data.results.map((r: any) => formatName(r.name)).sort();
 }
 
 export async function fetchAllItems(): Promise<string[]> {
@@ -256,7 +291,7 @@ export async function fetchMoveDetails(moveName: string): Promise<MoveDetails> {
   }
 
   return {
-    name: moveName,
+    name: formatName(data.name),
     type: data.type.name,
     power: data.power,
     accuracy: data.accuracy,

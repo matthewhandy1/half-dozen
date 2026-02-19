@@ -94,6 +94,7 @@ const CHAMPION_TEMPLATES = [
 const App: React.FC = () => {
   const [team, setTeam] = useState<PokemonTeam>([null, null, null, null, null, null]);
   const [enemyTeam, setEnemyTeam] = useState<PokemonTeam>([null, null, null, null, null, null]);
+  const [activeRival, setActiveRival] = useState<{ name: string; avatar: string } | null>(null);
   const [pokemonList, setPokemonList] = useState<{ name: string; id: number }[]>([]);
   const [allMovesList, setAllMovesList] = useState<string[]>([]);
   const [allItemsList, setAllItemsList] = useState<string[]>([]);
@@ -340,16 +341,29 @@ const App: React.FC = () => {
     });
   };
 
-  const handleLoadEnemyTeam = (loadedTeam: PokemonTeam) => {
+  const handleLoadEnemyTeam = (loadedTeam: PokemonTeam, rivalMetadata?: { name: string; avatar: string }) => {
     setEnemyTeam(JSON.parse(JSON.stringify(loadedTeam)));
+    if (rivalMetadata) setActiveRival(rivalMetadata);
   };
 
   const handleClearTeam = () => {
     setTeam([null, null, null, null, null, null]);
   };
 
+  const handleReplacePokemon = async (index: number, identifier: string | number) => {
+    try {
+      const pokemon = await fetchPokemon(identifier);
+      const newTeam = [...team];
+      newTeam[index] = pokemon;
+      setTeam(newTeam);
+    } catch (e) {
+      console.error("Replacement Error:", e);
+    }
+  };
+
   const handleClearEnemyTeam = () => {
     setEnemyTeam([null, null, null, null, null, null]);
+    setActiveRival(null);
   };
 
   const handleStartSaveTeam = () => {
@@ -600,9 +614,9 @@ const App: React.FC = () => {
         </section>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 sm:gap-8">
-          <TypeChart team={team} generation={selectedGen} />
+          <TypeChart team={team} generation={selectedGen} onReplace={handleReplacePokemon} />
           <div className="flex flex-col gap-8">
-            <OffensiveMatrix team={team} generation={selectedGen} />
+            <OffensiveMatrix team={team} generation={selectedGen} onReplace={handleReplacePokemon} />
           </div>
         </div>
 

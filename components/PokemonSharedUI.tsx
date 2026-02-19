@@ -1,8 +1,31 @@
 
 import React, { useMemo } from 'react';
-import { Swords, Sparkles, CircleDashed, Zap, Target, Shield, Sword, ShieldAlert, ShieldCheck, HelpCircle, Lightbulb } from 'lucide-react';
+import { 
+  Swords, Sparkles, CircleDashed, Zap, Target, Shield, Sword, ShieldAlert, ShieldCheck, HelpCircle, Lightbulb,
+  Loader2, User
+} from 'lucide-react';
 import { TYPE_COLORS, getChartForGen, getTypesForGen } from '../constants';
 import { MoveDetails } from '../types';
+
+export const TrainerSprite: React.FC<{ id: string; name?: string; className?: string }> = ({ id, name, className = "" }) => {
+  const [status, setStatus] = React.useState<'loading' | 'error' | 'success'>('loading');
+  const spriteUrl = `https://play.pokemonshowdown.com/sprites/trainers/${id}.png`;
+
+  return (
+    <div className={`relative flex items-center justify-center overflow-hidden bg-slate-900/50 ${className}`}>
+      {status === 'loading' && <Loader2 className="absolute w-6 h-6 animate-spin text-slate-700" />}
+      {status === 'error' && <User className="w-1/2 h-1/2 text-slate-700" />}
+      <img 
+        src={spriteUrl} 
+        alt={name || "Trainer"} 
+        className={`${status === 'success' ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300 object-contain w-full h-full`}
+        onLoad={() => setStatus('success')}
+        onError={() => setStatus('error')}
+        title={name}
+      />
+    </div>
+  );
+};
 
 export const ControlTooltip = React.memo(({ text }: { text: string }) => (
   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 z-[200] hidden sm:block">

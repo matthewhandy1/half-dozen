@@ -36,15 +36,20 @@ export const SPECIES_COLORS: Record<string, string> = {
 export const POKEMON_TYPES = Object.keys(TYPE_COLORS);
 
 export const GENERATIONS = [
-  { id: 1, name: 'Gen 1', region: 'Kanto', limit: 151 },
-  { id: 2, name: 'Gen 2', region: 'Johto', limit: 251 },
-  { id: 3, name: 'Gen 3', region: 'Hoenn', limit: 386 },
-  { id: 4, name: 'Gen 4', region: 'Sinnoh', limit: 493 },
-  { id: 5, name: 'Gen 5', region: 'Unova', limit: 649 },
-  { id: 6, name: 'Gen 6', region: 'Kalos', limit: 721 },
-  { id: 7, name: 'Gen 7', region: 'Alola', limit: 809 },
-  { id: 8, name: 'Gen 8', region: 'Galar', limit: 898 },
-  { id: 9, name: 'Gen 9', region: 'Paldea', limit: 1025 },
+  { id: 1, name: 'Gen 1', region: 'Kanto', limit: 151, mechanics: 1 },
+  { id: 2, name: 'Gen 2', region: 'Johto', limit: 251, mechanics: 2 },
+  { id: 3, name: 'Gen 3', region: 'Hoenn', limit: 386, mechanics: 3 },
+  { id: 10, name: 'FRLG', region: 'Kanto', limit: 151, mechanics: 3 },
+  { id: 4, name: 'Gen 4', region: 'Sinnoh', limit: 493, mechanics: 4 },
+  { id: 11, name: 'HGSS', region: 'Johto', limit: 251, mechanics: 4 },
+  { id: 5, name: 'Gen 5', region: 'Unova', limit: 649, mechanics: 5 },
+  { id: 6, name: 'Gen 6', region: 'Kalos', limit: 721, mechanics: 6 },
+  { id: 12, name: 'ORAS', region: 'Hoenn', limit: 386, mechanics: 6 },
+  { id: 7, name: 'Gen 7', region: 'Alola', limit: 809, mechanics: 7 },
+  { id: 13, name: 'LGPE', region: 'Kanto', limit: 151, mechanics: 7 },
+  { id: 8, name: 'Gen 8', region: 'Galar', limit: 898, mechanics: 8 },
+  { id: 14, name: 'BDSP', region: 'Sinnoh', limit: 493, mechanics: 8 },
+  { id: 9, name: 'Gen 9', region: 'Paldea', limit: 1025, mechanics: 9 },
 ];
 
 // Modern Chart (Gen 6+)
@@ -101,15 +106,19 @@ const GEN1_CHART: Record<string, Record<string, number>> = {
 };
 
 export const getChartForGen = (genId: number) => {
-  if (genId === 1) return GEN1_CHART;
-  if (genId <= 5) return GEN2_5_CHART;
+  const gen = GENERATIONS.find(g => g.id === genId);
+  const mechanics = gen?.mechanics || 9;
+  if (mechanics === 1) return GEN1_CHART;
+  if (mechanics <= 5) return GEN2_5_CHART;
   return MODERN_CHART;
 };
 
 export const getTypesForGen = (genId: number) => {
+  const gen = GENERATIONS.find(g => g.id === genId);
+  const mechanics = gen?.mechanics || 9;
   const types = [...POKEMON_TYPES];
-  if (genId === 1) return types.filter(t => t !== 'dark' && t !== 'steel' && t !== 'fairy');
-  if (genId <= 5) return types.filter(t => t !== 'fairy');
+  if (mechanics === 1) return types.filter(t => t !== 'dark' && t !== 'steel' && t !== 'fairy');
+  if (mechanics <= 5) return types.filter(t => t !== 'fairy');
   return types;
 };
 
