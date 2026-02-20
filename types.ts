@@ -89,3 +89,15 @@ export interface MasterSyncPackage {
   enemyTeams: SavedEnemyTeam[];
   version: string;
 }
+
+export interface User {
+  id: number;
+  email: string;
+  name?: string;
+  avatar?: string;
+}
+
+export interface AuthState {
+  user: User | null;
+  loading: boolean;
+}

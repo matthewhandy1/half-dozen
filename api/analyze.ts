@@ -1,43 +1,25 @@
-
 import { GoogleGenAI } from "@google/genai";
 
-export const config = {
-  runtime: 'edge',
-};
-
-export default async function handler(req: Request) {
+export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'API key not configured' });
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  const { team } = req.body;
+
   try {
-    const { prompt, isJson, schema } = await req.json();
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-    const config: any = {
-      thinkingConfig: { thinkingBudget: 0 }
-    };
-
-    if (isJson && schema) {
-      config.responseMimeType = "application/json";
-      config.responseSchema = schema;
-    }
-
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config
+      model: "gemini-3-flash-preview",
+      contents: `Analyze this Pokemon team: ${JSON.stringify(team)}`,
     });
-
-    return new Response(JSON.stringify({ text: response.text }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error: any) {
-    console.error("Backend API Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    res.status(200).json({ analysis: response.text });
+  } catch (error) {
+    res.status(500).json({ error: 'Analysis failed' });
   }
 }

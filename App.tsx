@@ -6,11 +6,15 @@ import { OffensiveMatrix } from './components/OffensiveMatrix';
 import { TeamStats } from './components/TeamStats';
 import { VaultModal } from './components/VaultModal';
 import { InfoModal } from './components/InfoModal';
+import { ContactModal } from './components/ContactModal';
+import { AuthModal } from './components/AuthModal';
 import { EnemyTeamSection } from './components/EnemyTeamSection';
-import { PokemonData, PokemonTeam, BoxPokemon, SavedTeam, SavedEnemyTeam, UserProfile, MasterSyncPackage } from './types';
+import { PokemonData, PokemonTeam, BoxPokemon, SavedTeam, SavedEnemyTeam, UserProfile, MasterSyncPackage, User, AuthState } from './types';
 import { fetchAllPokemonNames, fetchPokemon, fetchAllMoves, fetchAllItems, fetchPokemonBasic, fetchItemDescription, fetchMoveDetails } from './services/pokeApi';
 import { STAT_ABBREVIATIONS, GENERATIONS } from './constants';
-import { Trash2, Save, Check, BarChart3, LayoutGrid, Fingerprint, PackagePlus, X, User, Loader2, Info, Heart, Layers, HelpCircle, Download } from 'lucide-react';
+import { Trash2, Save, Check, BarChart3, LayoutGrid, Fingerprint, PackagePlus, X, User as UserIcon, Loader2, Info, Heart, Layers, HelpCircle, Download, ShieldAlert, LogIn } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { TrainerSprite } from './components/PokemonSharedUI';
 
 const APP_VERSION = "6.5.0";
 
@@ -29,7 +33,7 @@ const HeaderTrainerSprite: React.FC<{ name: string }> = ({ name }) => {
   return (
     <div className="w-full h-full flex items-center justify-center overflow-hidden shrink-0">
       {status === 'loading' && <Loader2 className="w-4 h-4 animate-spin text-slate-600" />}
-      {status === 'error' && <User className="w-5 h-5 text-slate-700" />}
+      {status === 'error' && <UserIcon className="w-5 h-5 text-slate-700" />}
       <img 
         src={url} 
         alt="Trainer" 
@@ -102,11 +106,15 @@ const App: React.FC = () => {
   const [showSavedFeedback, setShowSavedFeedback] = useState(false);
   const [showBulkStashFeedback, setShowBulkStashFeedback] = useState(false);
   const [isNamingTeam, setIsNamingTeam] = useState(false);
+  const [isContactOpen, setIsContactOpen] = useState(false);
   const [teamNameToSave, setTeamNameToSave] = useState('');
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   
   const [vaultState, setVaultState] = useState<{ open: boolean, tab: 'profile' | 'teams' | 'box' | 'intel' }>({ open: false, tab: 'profile' });
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [auth, setAuth] = useState<AuthState>({ user: null, loading: true });
+  const [showMigrationPrompt, setShowMigrationPrompt] = useState(false);
 
   // Sharing handling state
   const [pendingShare, setPendingShare] = useState<{ type: 'p' | 't', data: any } | null>(null);
@@ -146,6 +154,70 @@ const App: React.FC = () => {
       return stored ? JSON.parse(stored) : [];
     } catch (e) { return []; }
   });
+
+  // Check Auth and Local Data
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        setAuth({ user: data.user, loading: false });
+
+        // If not logged in, check if there's data to migrate
+        if (!data.user) {
+          const hasData = localStorage.getItem('half-dozen-teams') || 
+                          localStorage.getItem('half-dozen-box') || 
+                          localStorage.getItem('half-dozen-profile');
+          if (hasData) {
+            setShowMigrationPrompt(true);
+          }
+        }
+      } catch (err) {
+        setAuth({ user: null, loading: false });
+      }
+    };
+    checkAuth();
+  }, []);
+
+  const handleAuthSuccess = (user: User) => {
+    setAuth({ user, loading: false });
+    setShowMigrationPrompt(false);
+    // Trigger a cloud save immediately to sync local data to new account
+    triggerCloudSync();
+  };
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    setAuth({ user: null, loading: false });
+    // Clear local storage on logout if desired, or keep it. 
+    // Usually better to keep it but mark as "local only"
+  };
+
+  const triggerCloudSync = async () => {
+    const syncId = localStorage.getItem('half-dozen-sync-id') || `S-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    if (!localStorage.getItem('half-dozen-sync-id')) {
+      localStorage.setItem('half-dozen-sync-id', syncId);
+    }
+
+    const payload: MasterSyncPackage = {
+      profile,
+      team,
+      box,
+      teams,
+      enemyTeams,
+      version: APP_VERSION
+    };
+
+    try {
+      await fetch('/api/sync/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ syncId, data: payload })
+      });
+    } catch (e) {
+      console.error("Cloud sync failed", e);
+    }
+  };
 
   // Share detection logic
   useEffect(() => {
@@ -281,10 +353,20 @@ const App: React.FC = () => {
     } catch (e) { console.error("Hydration Error:", e); }
   };
 
-  useEffect(() => localStorage.setItem('half-dozen-box', JSON.stringify(box)), [box]);
-  useEffect(() => localStorage.setItem('half-dozen-teams', JSON.stringify(teams)), [teams]);
-  useEffect(() => localStorage.setItem('half-dozen-enemy-teams', JSON.stringify(enemyTeams)), [enemyTeams]);
-  useEffect(() => localStorage.setItem('half-dozen-profile', JSON.stringify(profile)), [profile]);
+  useEffect(() => {
+    localStorage.setItem('half-dozen-box', JSON.stringify(box));
+    localStorage.setItem('half-dozen-teams', JSON.stringify(teams));
+    localStorage.setItem('half-dozen-enemy-teams', JSON.stringify(enemyTeams));
+    localStorage.setItem('half-dozen-profile', JSON.stringify(profile));
+    
+    // Auto-sync to cloud if logged in
+    if (auth.user) {
+      const timer = setTimeout(() => {
+        triggerCloudSync();
+      }, 2000); // Debounce sync by 2s
+      return () => clearTimeout(timer);
+    }
+  }, [box, teams, enemyTeams, profile, team, auth.user]);
 
   const handleSelectPokemon = (index: number, pokemon: PokemonData | null) => {
     const newTeam = [...team];
@@ -416,13 +498,44 @@ const App: React.FC = () => {
       enemyTeams, 
       version: APP_VERSION 
     };
-    const jsonStr = JSON.stringify(pkg);
-    return await compress(jsonStr);
+    
+    // Generate a unique sync ID if not already present or use profile ID
+    const syncId = `SYNC-${profile.trainerId}-${Math.random().toString(36).substring(2, 7)}`.toUpperCase();
+    
+    try {
+      const response = await fetch("/api/sync/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ syncId, data: pkg }),
+      });
+      
+      if (!response.ok) throw new Error("Cloud sync failed");
+      
+      // We return the syncId so the UI can show it to the user
+      return syncId;
+    } catch (error) {
+      console.error("Cloud Sync Error:", error);
+      // Fallback to local compression if cloud fails
+      const jsonStr = JSON.stringify(pkg);
+      return await compress(jsonStr);
+    }
   };
 
   const handleImportMasterKey = async (key: string) => {
     try {
-      const decoded: MasterSyncPackage = await decompress(key);
+      let decoded: MasterSyncPackage;
+      
+      if (key.startsWith("SYNC-")) {
+        // Cloud Load
+        const response = await fetch(`/api/sync/load/${key}`);
+        if (!response.ok) throw new Error("Cloud data not found or expired");
+        const result = await response.json();
+        decoded = result.data;
+      } else {
+        // Legacy Local Load
+        decoded = await decompress(key);
+      }
+
       if (decoded.profile) setProfile(decoded.profile);
       if (decoded.team) setTeam(decoded.team);
       if (decoded.box) setBox(decoded.box);
@@ -471,8 +584,31 @@ const App: React.FC = () => {
             </div>
           </div>
           
-          <div className="flex items-center gap-2 sm:gap-4 h-11 sm:h-14">
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl">
+            <div className="flex items-center gap-2 sm:gap-4 h-11 sm:h-14">
+              {auth.user ? (
+                <div 
+                  className="h-11 w-11 sm:h-auto sm:w-auto flex items-center gap-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl sm:rounded-[1.25rem] transition-all group cursor-pointer overflow-hidden sm:px-4 sm:py-2" 
+                  onClick={() => setVaultState({ open: true, tab: 'profile' })}
+                >
+                  <div className="text-right hidden sm:block">
+                    <p className="text-white text-xs font-black uppercase italic leading-none">{auth.user.name || profile.name}</p>
+                    <p className="text-indigo-400 text-[9px] font-black uppercase tracking-widest mt-1 opacity-60">Architect Account</p>
+                  </div>
+                  <div className="w-11 h-11 sm:w-10 sm:h-10 shrink-0">
+                    <HeaderTrainerSprite name={auth.user.avatar || profile.avatar} />
+                  </div>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setIsAuthOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase italic rounded-xl transition-all shadow-lg shadow-indigo-500/20"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span className="hidden sm:inline">Sign In</span>
+                </button>
+              )}
+
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl">
               <Layers className="w-3.5 h-3.5 text-indigo-400" />
               <select 
                 value={selectedGen} 
@@ -485,19 +621,6 @@ const App: React.FC = () => {
                   <option key={g.id} value={g.id} className="bg-slate-900 text-white">{g.name} ({g.region})</option>
                 ))}
               </select>
-            </div>
-
-            <div 
-              className="h-11 w-11 sm:h-auto sm:w-auto flex items-center gap-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl sm:rounded-[1.25rem] transition-all group cursor-pointer overflow-hidden sm:px-4 sm:py-2" 
-              onClick={() => setVaultState({ open: true, tab: 'profile' })}
-            >
-              <div className="text-right hidden sm:block">
-                <p className="text-white text-xs font-black uppercase italic leading-none">{profile.name}</p>
-                <p className="text-indigo-400 text-[9px] font-black uppercase tracking-widest mt-1 opacity-60">ID #{profile.trainerId}</p>
-              </div>
-              <div className="w-11 h-11 sm:w-10 sm:h-10 shrink-0">
-                <HeaderTrainerSprite name={profile.avatar || 'red'} />
-              </div>
             </div>
 
             <button 
@@ -623,6 +746,7 @@ const App: React.FC = () => {
         <EnemyTeamSection 
           userTeam={team} 
           enemyTeam={enemyTeam} 
+          activeRival={activeRival}
           onSelectEnemy={handleSelectEnemyPokemon} 
           pokemonList={pokemonList}
           onSaveEnemyTeam={handleSaveEnemyTeam}
@@ -646,6 +770,12 @@ const App: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+          <button 
+            onClick={() => setIsContactOpen(true)}
+            className="hover:text-indigo-400 transition-colors mr-4"
+          >
+            Contact
+          </button>
           Made with <Heart className="w-3 h-3 text-red-500 fill-red-500 animate-pulse" /> by <span className="text-slate-300 font-black italic">Handyful</span>
         </div>
       </footer>
@@ -711,6 +841,49 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {/* Migration Prompt */}
+      <AnimatePresence>
+        {showMigrationPrompt && !auth.user && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] w-[90%] max-w-lg bg-indigo-600 border border-indigo-400 rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/20 rounded-xl">
+                <ShieldAlert className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">Save your teams to the cloud!</p>
+                <p className="text-xs text-indigo-100 opacity-80">We detected local data. Create an account to sync across devices.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setShowMigrationPrompt(false)}
+                className="p-2 text-white/60 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <button 
+                onClick={() => setIsAuthOpen(true)}
+                className="px-4 py-2 bg-white text-indigo-600 text-xs font-black uppercase italic rounded-xl hover:bg-slate-100 transition-all"
+              >
+                Sign Up
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AuthModal 
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        onSuccess={handleAuthSuccess}
+        migrationData={showMigrationPrompt}
+      />
+
       {vaultState.open && (
         <VaultModal 
           activeTab={vaultState.tab}
@@ -718,6 +891,7 @@ const App: React.FC = () => {
           teams={teams}
           box={box}
           enemyTeams={enemyTeams}
+          auth={auth}
           onClose={() => setVaultState({...vaultState, open: false})}
           onUpdateProfile={setProfile}
           onDeleteTeam={handleDeleteTeam}
@@ -735,12 +909,18 @@ const App: React.FC = () => {
           onClearAllEnemyTeams={() => setEnemyTeams([])}
           onExportMasterKey={handleExportMasterKey}
           onImportMasterKey={handleImportMasterKey}
+          onLogout={handleLogout}
         />
       )}
 
       {isInfoOpen && (
         <InfoModal onClose={() => setIsInfoOpen(false)} />
       )}
+
+      <ContactModal 
+        isOpen={isContactOpen} 
+        onClose={() => setIsContactOpen(false)} 
+      />
       
       {isStatsModalOpen && <TeamStats team={team} onClose={() => setIsStatsModalOpen(false)} />}
     </div>

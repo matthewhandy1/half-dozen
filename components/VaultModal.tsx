@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserProfile, PokemonTeam, BoxPokemon, SavedTeam, SavedEnemyTeam, PokemonData, SelectedMove } from '../types';
+import { UserProfile, PokemonTeam, BoxPokemon, SavedTeam, SavedEnemyTeam, PokemonData, SelectedMove, AuthState } from '../types';
 import { 
   X, Fingerprint, Users, Package, ShieldAlert, 
   Save, Copy, Check, Upload, Trash2, Edit3, 
@@ -36,6 +36,8 @@ interface VaultModalProps {
   onClearAllEnemyTeams: () => void;
   onExportMasterKey: () => Promise<string>;
   onImportMasterKey: (key: string) => Promise<void>;
+  onLogout?: () => void;
+  auth?: AuthState;
 }
 
 const TRAINER_CLASSES = [
@@ -418,7 +420,7 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
                   <div className="bg-slate-950/50 border border-slate-800 rounded-[1.5rem] sm:rounded-[2.5rem] p-6 sm:p-12 relative overflow-hidden">
                     <div className="flex flex-col sm:flex-row gap-6 sm:gap-10 items-center">
                       <div className="w-32 h-32 sm:w-48 sm:h-48 bg-slate-900 rounded-[1.5rem] sm:rounded-[2.5rem] border-4 border-slate-800 flex items-center justify-center shadow-2xl shrink-0 overflow-hidden relative group/avatar">
-                        <TrainerSprite id={tempProfile.avatar || props.profile.avatar || 'red'} className="w-full h-full object-contain scale-125 translate-y-2 drop-shadow-xl" />
+                        <TrainerSprite id={props.auth?.user?.avatar || tempProfile.avatar || props.profile.avatar || 'red'} className="w-full h-full object-contain scale-125 translate-y-2 drop-shadow-xl" />
                       </div>
                       <div className="flex-1 text-center sm:text-left">
                         {isEditingProfile ? (
@@ -429,8 +431,17 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
                           </div>
                         ) : (
                           <>
-                            <div className="flex items-center justify-center sm:justify-start gap-4 mb-2"><h2 className="text-3xl sm:text-5xl font-black text-white uppercase italic tracking-tighter">{props.profile.name}</h2><button onClick={() => { setTempProfile({name: props.profile.name, class: props.profile.trainerClass, avatar: props.profile.avatar}); setIsEditingProfile(true); }} className="p-2 text-slate-600 hover:text-emerald-400 transition-colors"><Edit3 className="w-6 h-6" /></button></div>
-                            <div className="inline-flex items-center px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-full"><p className="text-emerald-400 font-black uppercase tracking-[0.2em] text-[10px] sm:text-xs italic">{props.profile.trainerClass}</p></div>
+                            <div className="flex items-center justify-center sm:justify-start gap-4 mb-2">
+                              <h2 className="text-3xl sm:text-5xl font-black text-white uppercase italic tracking-tighter">
+                                {props.auth?.user?.name || props.profile.name}
+                              </h2>
+                              <button onClick={() => { setTempProfile({name: props.profile.name, class: props.profile.trainerClass, avatar: props.profile.avatar}); setIsEditingProfile(true); }} className="p-2 text-slate-600 hover:text-emerald-400 transition-colors"><Edit3 className="w-6 h-6" /></button>
+                            </div>
+                            <div className="inline-flex items-center px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-full">
+                              <p className="text-emerald-400 font-black uppercase tracking-[0.2em] text-[10px] sm:text-xs italic">
+                                {props.auth?.user ? 'Architect Account' : props.profile.trainerClass}
+                              </p>
+                            </div>
                           </>
                         )}
                       </div>
@@ -447,6 +458,22 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
                       <input className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-[10px] font-mono text-indigo-300 outline-none" placeholder="Paste Backup Key..." value={importKey} onChange={e => setImportKey(e.target.value)} />
                       <button onClick={handleImport} disabled={!importKey || isProcessing} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-[10px] sm:text-xs shadow-lg transition-all flex items-center justify-center gap-2">{isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Restore All Data</button>
                     </div>
+                    {props.onLogout && (
+                      <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 space-y-4 shadow-xl md:col-span-2">
+                        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Account Management</h4>
+                        <button 
+                          onClick={() => {
+                            if (confirm("Are you sure you want to log out?")) {
+                              props.onLogout?.();
+                              props.onClose();
+                            }
+                          }}
+                          className="w-full py-4 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/20 rounded-2xl font-black uppercase text-[10px] sm:text-xs transition-all flex items-center justify-center gap-2"
+                        >
+                          Sign Out of Architect Account
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -4,10 +4,12 @@ import { PokemonTeam, PokemonData } from '../types';
 import { getChartForGen, getTypesForGen, TYPE_COLORS } from '../constants';
 import { Search, X, ShieldAlert, Loader2, Save, FolderOpen, Sword, Check, AlertCircle, Trash2 } from 'lucide-react';
 import { fetchPokemonBasic } from '../services/pokeApi';
+import { TrainerSprite } from './PokemonSharedUI';
 
 interface EnemyTeamSectionProps {
   userTeam: PokemonTeam;
   enemyTeam: PokemonTeam;
+  activeRival?: { name: string; avatar: string } | null;
   onSelectEnemy: (index: number, pokemon: PokemonData | null) => void;
   pokemonList: { name: string; id: number }[];
   onSaveEnemyTeam: (name: string) => void;
@@ -20,6 +22,7 @@ interface EnemyTeamSectionProps {
 export const EnemyTeamSection: React.FC<EnemyTeamSectionProps> = ({ 
   userTeam, 
   enemyTeam, 
+  activeRival,
   onSelectEnemy, 
   pokemonList, 
   onSaveEnemyTeam, 
@@ -117,6 +120,34 @@ export const EnemyTeamSection: React.FC<EnemyTeamSectionProps> = ({
           </button>
         </div>
       </div>
+
+      {activeRival && (
+        <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
+          <div className="bg-red-600/10 border border-red-500/20 rounded-[2rem] p-4 sm:p-6 flex items-center justify-between shadow-2xl shadow-red-900/10">
+            <div className="flex items-center gap-4 sm:gap-6">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-900 rounded-2xl overflow-hidden border border-red-500/30 shadow-lg shrink-0">
+                <TrainerSprite id={activeRival.avatar} className="w-full h-full scale-125 translate-y-2" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <ShieldAlert className="w-4 h-4 text-red-500" />
+                  <span className="text-[10px] font-black text-red-500 uppercase tracking-[0.2em]">Rival Intel Loaded</span>
+                </div>
+                <h2 className="text-2xl sm:text-4xl font-black text-white uppercase italic tracking-tighter leading-none">
+                  {activeRival.name}
+                </h2>
+              </div>
+            </div>
+            <button 
+              onClick={onClearEnemyTeam}
+              className="p-3 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-xl transition-all active:scale-95"
+              title="Dismiss Rival"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-8 sm:mb-12">
         {enemyTeam.map((p, i) => (
