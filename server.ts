@@ -1,4 +1,6 @@
 import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { Resend } from "resend";
@@ -17,6 +19,7 @@ declare module "express-session" {
 }
 
 const PostgresStore = connectPgSimple(session);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function startServer() {
   const app = express();
@@ -121,7 +124,7 @@ async function startServer() {
   };
 
   // Auth Routes
-  app.post(["/api/auth/signup", "/api/auth/signup/"], async (req, res) => {
+  app.post("/api/auth/signup", async (req, res) => {
     const { email, password, name } = req.body;
     if (!email || !password) return res.status(400).json({ error: "Email and password required" });
 
@@ -142,7 +145,7 @@ async function startServer() {
     }
   });
 
-  app.post(["/api/auth/login", "/api/auth/login/"], async (req, res) => {
+  app.post("/api/auth/login", async (req, res) => {
     const { email, password } = req.body;
     try {
       const client = await db.connect();
@@ -160,7 +163,7 @@ async function startServer() {
     }
   });
 
-  app.get(["/api/auth/me", "/api/auth/me/"], async (req, res) => {
+  app.get("/api/auth/me", async (req, res) => {
     if (!req.session.userId) return res.json({ user: null });
     try {
       const client = await db.connect();
@@ -171,7 +174,7 @@ async function startServer() {
     }
   });
 
-  app.post(["/api/auth/logout", "/api/auth/logout/"], (req, res) => {
+  app.post("/api/auth/logout", (req, res) => {
     req.session.destroy(() => {
       res.json({ success: true });
     });
@@ -298,6 +301,10 @@ async function startServer() {
     }
   });
 
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", env: process.env.NODE_ENV });
+  });
+
   // JSON 404 for API routes
   app.all("/api/*", (req, res) => {
     res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });
@@ -317,9 +324,9 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static("dist"));
+    app.use(express.static(path.resolve(__dirname, "dist")));
     app.get("*", (req, res) => {
-      res.sendFile("dist/index.html", { root: "." });
+      res.sendFile(path.resolve(__dirname, "dist", "index.html"));
     });
   }
 
