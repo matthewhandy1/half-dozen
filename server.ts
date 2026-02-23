@@ -54,6 +54,16 @@ async function startServer() {
         );
       `;
 
+      // Migration: Add user_id to sync_data if it doesn't exist
+      await client.sql`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sync_data' AND column_name='user_id') THEN
+            ALTER TABLE sync_data ADD COLUMN user_id INTEGER REFERENCES users(id);
+          END IF;
+        END $$;
+      `;
+
       // Session table for connect-pg-simple
       await client.sql`
         CREATE TABLE IF NOT EXISTS "session" (
