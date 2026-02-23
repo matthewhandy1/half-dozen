@@ -208,27 +208,6 @@ app.post("/api/auth/logout", (req, res) => {
 });
 
 // API Routes
-app.post("/api/analyze", async (req, res) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: "GEMINI_API_KEY not configured" });
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
-  const { team } = req.body;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Analyze this Pokemon team for competitive play: ${JSON.stringify(team)}`,
-    });
-    res.status(200).json({ analysis: response.text });
-  } catch (error) {
-    console.error("Analysis failed:", error);
-    res.status(500).json({ error: "Analysis failed" });
-  }
-});
-
 app.post("/api/contact", async (req, res) => {
   const { name, email, message } = req.body;
   const resendKey = process.env.RESEND_API_KEY;
