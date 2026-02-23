@@ -316,7 +316,7 @@ app.get("/api/health", (req, res) => {
 });
 
 // JSON 404 for API routes
-app.all("/api/(.*)", (req, res) => {
+app.all("/api/:path*", (req, res) => {
   res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });
 });
 
