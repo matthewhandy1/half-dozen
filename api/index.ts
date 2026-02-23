@@ -7,7 +7,7 @@ import { db } from "@vercel/postgres";
 import dotenv from "dotenv";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import bcrypt from "bcryptjs";
+import * as bcrypt from "bcryptjs";
 
 dotenv.config();
 
@@ -23,12 +23,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = 3000;
 
-// Initialize Database (Non-blocking)
+// Initialize Database (Lazy)
+let isDbInitialized = false;
 const initDb = async () => {
-  if (!process.env.POSTGRES_URL) {
-    console.warn("POSTGRES_URL not found. Database features will be disabled.");
-    return;
-  }
+  if (isDbInitialized || !process.env.POSTGRES_URL) return;
+  
   try {
     const client = await db.connect();
     
@@ -45,7 +44,7 @@ const initDb = async () => {
       );
     `;
 
-    // Sync data table (updated to link to user_id)
+    // Sync data table
     await client.sql`
       CREATE TABLE IF NOT EXISTS sync_data (
         sync_id TEXT PRIMARY KEY,
@@ -55,7 +54,7 @@ const initDb = async () => {
       );
     `;
 
-    // Migration: Add user_id to sync_data if it doesn't exist
+    // Migration
     await client.sql`
       DO $$
       BEGIN
@@ -65,7 +64,7 @@ const initDb = async () => {
       END $$;
     `;
 
-    // Session table for connect-pg-simple
+    // Session table
     await client.sql`
       CREATE TABLE IF NOT EXISTS "session" (
         "sid" varchar NOT NULL COLLATE "default",
@@ -83,14 +82,20 @@ const initDb = async () => {
       CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
     `;
 
-    console.log("Database initialized and tables verified.");
+    isDbInitialized = true;
+    console.log("Database initialized.");
   } catch (error) {
     console.error("Database initialization failed:", error);
   }
 };
 
-// Start DB init in background
-initDb();
+// Middleware to ensure DB is ready
+app.use(async (req, res, next) => {
+  if (!isDbInitialized && req.path.startsWith('/api')) {
+    await initDb();
+  }
+  next();
+});
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -311,7 +316,7 @@ app.get("/api/health", (req, res) => {
 });
 
 // JSON 404 for API routes
-app.all("/api/*", (req, res) => {
+app.all("/api/(.*)", (req, res) => {
   res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });
 });
 
@@ -322,8 +327,8 @@ app.use((err: any, req: any, res: any, next: any) => {
 });
 
 // Setup Vite or Static serving
-const setupApp = async () => {
-  if (process.env.NODE_ENV !== "production") {
+if (process.env.NODE_ENV !== "production") {
+  const setupDev = async () => {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -334,10 +339,8 @@ const setupApp = async () => {
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
-  }
-  // In production on Vercel, static serving is handled by vercel.json rewrites
-};
-
-setupApp();
+  };
+  setupDev();
+}
 
 export default app;
