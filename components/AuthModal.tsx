@@ -67,7 +67,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      const data = await res.json();
+      
+      const contentType = res.headers.get("content-type");
+      let data;
+      
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        console.error("Non-JSON response received:", text);
+        throw new Error(`Server returned an unexpected response (${res.status}). Please try again later.`);
+      }
 
       if (!res.ok) throw new Error(data.error || 'Authentication failed');
 

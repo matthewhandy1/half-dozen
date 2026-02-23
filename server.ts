@@ -91,6 +91,10 @@ async function startServer() {
 
   app.use(express.json({ limit: '10mb' }));
 
+  if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+  }
+
   // Session Middleware
   app.use(session({
     store: new PostgresStore({
@@ -117,7 +121,7 @@ async function startServer() {
   };
 
   // Auth Routes
-  app.post("/api/auth/signup", async (req, res) => {
+  app.post(["/api/auth/signup", "/api/auth/signup/"], async (req, res) => {
     const { email, password, name } = req.body;
     if (!email || !password) return res.status(400).json({ error: "Email and password required" });
 
@@ -138,7 +142,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/auth/login", async (req, res) => {
+  app.post(["/api/auth/login", "/api/auth/login/"], async (req, res) => {
     const { email, password } = req.body;
     try {
       const client = await db.connect();
@@ -156,7 +160,7 @@ async function startServer() {
     }
   });
 
-  app.get("/api/auth/me", async (req, res) => {
+  app.get(["/api/auth/me", "/api/auth/me/"], async (req, res) => {
     if (!req.session.userId) return res.json({ user: null });
     try {
       const client = await db.connect();
@@ -167,7 +171,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/auth/logout", (req, res) => {
+  app.post(["/api/auth/logout", "/api/auth/logout/"], (req, res) => {
     req.session.destroy(() => {
       res.json({ success: true });
     });
@@ -292,6 +296,17 @@ async function startServer() {
       console.error("Sync load error:", error);
       res.status(500).json({ error: "Failed to load sync data" });
     }
+  });
+
+  // JSON 404 for API routes
+  app.all("/api/*", (req, res) => {
+    res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });
+  });
+
+  // Global Error Handler
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error("Global Error:", err);
+    res.status(500).json({ error: "Internal Server Error", message: err.message });
   });
 
   // Vite middleware for development
