@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PokemonCard } from './components/PokemonCard';
 import { TypeChart } from './components/TypeChart';
 import { OffensiveMatrix } from './components/OffensiveMatrix';
@@ -119,6 +119,7 @@ const App: React.FC = () => {
   // Sharing handling state
   const [pendingShare, setPendingShare] = useState<{ type: 'p' | 't', data: any } | null>(null);
   const [isProcessingShare, setIsProcessingShare] = useState(false);
+  const isInitialLoading = useRef(true);
 
   const [profile, setProfile] = useState<UserProfile>(() => {
     try {
@@ -155,6 +156,34 @@ const App: React.FC = () => {
     } catch (e) { return []; }
   });
 
+  const fetchLatestCloudData = async () => {
+    try {
+      const res = await fetch('/api/sync/user');
+      if (!res.ok) return;
+      const { syncs } = await res.json();
+      if (syncs && syncs.length > 0) {
+        const latest = syncs[0]; // Ordered by updated_at DESC
+        const decoded = latest.data;
+        
+        if (decoded.profile) setProfile(decoded.profile);
+        if (decoded.team) setTeam(decoded.team);
+        if (decoded.box) setBox(decoded.box);
+        if (decoded.teams) setTeams(decoded.teams);
+        if (decoded.enemyTeams) setEnemyTeams(decoded.enemyTeams);
+        
+        localStorage.setItem('half-dozen-sync-id', latest.sync_id);
+        
+        decoded.team.forEach((p: any, idx: number) => {
+          if (p) hydrateSlot(idx, p);
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch cloud data", err);
+    } finally {
+      isInitialLoading.current = false;
+    }
+  };
+
   // Check Auth and Local Data
   useEffect(() => {
     const checkAuth = async () => {
@@ -163,8 +192,10 @@ const App: React.FC = () => {
         const data = await res.json();
         setAuth({ user: data.user, loading: false });
 
-        // If not logged in, check if there's data to migrate
-        if (!data.user) {
+        if (data.user) {
+          await fetchLatestCloudData();
+        } else {
+          isInitialLoading.current = false;
           const hasData = localStorage.getItem('half-dozen-teams') || 
                           localStorage.getItem('half-dozen-box') || 
                           localStorage.getItem('half-dozen-profile');
@@ -174,16 +205,17 @@ const App: React.FC = () => {
         }
       } catch (err) {
         setAuth({ user: null, loading: false });
+        isInitialLoading.current = false;
       }
     };
     checkAuth();
   }, []);
 
-  const handleAuthSuccess = (user: User) => {
+  const handleAuthSuccess = async (user: User) => {
     setAuth({ user, loading: false });
     setShowMigrationPrompt(false);
-    // Trigger a cloud save immediately to sync local data to new account
-    triggerCloudSync();
+    isInitialLoading.current = true;
+    await fetchLatestCloudData();
   };
 
   const handleLogout = async () => {
@@ -209,13 +241,20 @@ const App: React.FC = () => {
     };
 
     try {
-      await fetch('/api/sync/save', {
+      console.log("Triggering cloud sync for ID:", syncId);
+      const res = await fetch('/api/sync/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ syncId, data: payload })
       });
+      if (!res.ok) {
+        const errData = await res.json();
+        console.error("Cloud sync failed with status:", res.status, errData);
+      } else {
+        console.log("Cloud sync successful");
+      }
     } catch (e) {
-      console.error("Cloud sync failed", e);
+      console.error("Cloud sync network error", e);
     }
   };
 
@@ -359,8 +398,8 @@ const App: React.FC = () => {
     localStorage.setItem('half-dozen-enemy-teams', JSON.stringify(enemyTeams));
     localStorage.setItem('half-dozen-profile', JSON.stringify(profile));
     
-    // Auto-sync to cloud if logged in
-    if (auth.user) {
+    // Auto-sync to cloud if logged in and not currently loading initial data
+    if (auth.user && !isInitialLoading.current) {
       const timer = setTimeout(() => {
         triggerCloudSync();
       }, 2000); // Debounce sync by 2s

@@ -102,24 +102,22 @@ const initDb = async () => {
   return dbInitPromise;
 };
 
-// Middleware to ensure DB is ready
+app.use(express.json({ limit: '10mb' }));
+
+// Middleware to ensure DB is ready - MUST be before session
 app.use(async (req, res, next) => {
   if (req.path.startsWith('/api') && !isDbInitialized && req.path !== '/api/health') {
     try {
-      // Set a timeout for DB init to prevent infinite hangs
       const timeout = new Promise((_, reject) => 
         setTimeout(() => reject(new Error("DB Init Timeout")), 10000)
       );
       await Promise.race([initDb(), timeout]);
     } catch (err) {
       console.error("DB Init error in middleware:", err);
-      // We continue anyway, the specific route will fail if it needs the DB
     }
   }
   next();
 });
-
-app.use(express.json({ limit: '10mb' }));
 
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
@@ -161,7 +159,7 @@ app.post("/api/auth/signup", async (req, res) => {
   if (!email || !password) return res.status(400).json({ error: "Email and password required" });
 
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 8);
     const result = await db.sql`
       INSERT INTO users (email, password, name)
       VALUES (${email}, ${hashedPassword}, ${name || null})
