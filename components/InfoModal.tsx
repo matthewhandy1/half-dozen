@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { X, HelpCircle, LayoutGrid, Fingerprint, Package, ShieldAlert, Zap, Dna, Share2, Swords, ShieldCheck, Trophy, Map, Link as LinkIcon } from 'lucide-react';
+import { X, HelpCircle, LayoutGrid, Fingerprint, Package, ShieldAlert, Zap, Dna, Share2, Swords, ShieldCheck, Trophy, Map, Link as LinkIcon, RefreshCw, Database } from 'lucide-react';
 
 interface InfoModalProps {
   onClose: () => void;
@@ -32,8 +32,33 @@ export const InfoModal: React.FC<InfoModalProps> = ({ onClose }) => {
           
           <section className="space-y-6">
             <div className="flex items-center gap-3">
+              <Fingerprint className="w-6 h-6 text-emerald-400" />
+              <h3 className="text-lg font-black text-white uppercase italic tracking-tight">1. Architect Accounts</h3>
+            </div>
+            <div className="bg-emerald-600/10 border border-emerald-500/20 p-8 rounded-[2rem] space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <RefreshCw className="w-5 h-5 text-emerald-400" />
+                    <p className="text-sm font-black text-white uppercase italic">Cloud Synchronization</p>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed italic">Create an <span className="text-emerald-400 font-black italic">Architect Account</span> to automatically sync your vault across all devices. Your teams, storage box, and rival intel are always with you.</p>
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                    <p className="text-sm font-black text-white uppercase italic">Data Security</p>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed italic">Cloud accounts act as a permanent backup. If you clear your browser data or switch phones, simply log back in to restore your entire collection instantly.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-6">
+            <div className="flex items-center gap-3">
               <LayoutGrid className="w-6 h-6 text-indigo-400" />
-              <h3 className="text-lg font-black text-white uppercase italic tracking-tight">1. Building Your Team</h3>
+              <h3 className="text-lg font-black text-white uppercase italic tracking-tight">2. Building Your Team</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-slate-950/50 p-6 rounded-3xl border border-slate-800">
@@ -50,7 +75,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ onClose }) => {
           <section className="space-y-6">
             <div className="flex items-center gap-3">
               <ShieldAlert className="w-6 h-6 text-red-500" />
-              <h3 className="text-lg font-black text-white uppercase italic tracking-tight">2. Rival Scouting & Champions</h3>
+              <h3 className="text-lg font-black text-white uppercase italic tracking-tight">3. Rival Scouting & Champions</h3>
             </div>
             <div className="bg-slate-950/50 p-8 rounded-[2rem] border border-slate-800 space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
@@ -75,7 +100,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ onClose }) => {
           <section className="space-y-6">
             <div className="flex items-center gap-3">
               <Share2 className="w-6 h-6 text-indigo-400" />
-              <h3 className="text-lg font-black text-white uppercase italic tracking-tight">3. Modern Sharing</h3>
+              <h3 className="text-lg font-black text-white uppercase italic tracking-tight">4. Modern Sharing</h3>
             </div>
             <div className="bg-indigo-600/10 border border-indigo-500/20 p-8 rounded-[2rem] space-y-6">
                <p className="text-xs text-slate-400 leading-relaxed italic">
@@ -93,8 +118,8 @@ export const InfoModal: React.FC<InfoModalProps> = ({ onClose }) => {
 
           <section className="space-y-6">
             <div className="flex items-center gap-3">
-              <Fingerprint className="w-6 h-6 text-emerald-400" />
-              <h3 className="text-lg font-black text-white uppercase italic tracking-tight">4. Storage & Backups</h3>
+              <Database className="w-6 h-6 text-amber-400" />
+              <h3 className="text-lg font-black text-white uppercase italic tracking-tight">5. Storage & Backups</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="bg-slate-950/50 p-6 rounded-3xl border border-slate-800">
@@ -102,8 +127,8 @@ export const InfoModal: React.FC<InfoModalProps> = ({ onClose }) => {
                 <p className="text-xs text-slate-500 leading-relaxed italic">Store specific builds of individual Pokemon. Use <span className="text-amber-400 font-black italic">"Save All to Box"</span> to quickly stash your entire current team.</p>
               </div>
               <div className="bg-slate-950/50 p-6 rounded-3xl border border-slate-800">
-                <p className="text-sm font-bold text-slate-400 mb-2 uppercase tracking-widest">Full Backups</p>
-                <p className="text-xs text-slate-500 leading-relaxed italic">Found in the Profile tab, the <span className="text-emerald-400 font-black italic">Backup Key</span> allows you to export your entire vault (all teams and stored Pokemon) to another device.</p>
+                <p className="text-sm font-bold text-slate-400 mb-2 uppercase tracking-widest">Manual Backups</p>
+                <p className="text-xs text-slate-500 leading-relaxed italic">Not using a cloud account? Use the <span className="text-amber-400 font-black italic">Backup Key</span> in your profile to manually export your data to another device.</p>
               </div>
             </div>
           </section>

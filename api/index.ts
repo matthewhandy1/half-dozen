@@ -267,6 +267,16 @@ app.post("/api/sync/save", async (req, res) => {
       ON CONFLICT (sync_id) DO UPDATE
       SET data = EXCLUDED.data, user_id = COALESCE(EXCLUDED.user_id, sync_data.user_id), updated_at = CURRENT_TIMESTAMP;
     `;
+
+    // If logged in, also update the user's profile info in the users table
+    if (userId && data.profile) {
+      await db.sql`
+        UPDATE users 
+        SET name = ${data.profile.name}, avatar = ${data.profile.avatar}
+        WHERE id = ${userId};
+      `;
+    }
+
     res.status(200).json({ success: true });
   } catch (error) {
     console.error("Sync save error:", error);

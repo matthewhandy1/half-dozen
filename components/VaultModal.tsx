@@ -420,14 +420,42 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
                   <div className="bg-slate-950/50 border border-slate-800 rounded-[1.5rem] sm:rounded-[2.5rem] p-6 sm:p-12 relative overflow-hidden">
                     <div className="flex flex-col sm:flex-row gap-6 sm:gap-10 items-center">
                       <div className="w-32 h-32 sm:w-48 sm:h-48 bg-slate-900 rounded-[1.5rem] sm:rounded-[2.5rem] border-4 border-slate-800 flex items-center justify-center shadow-2xl shrink-0 overflow-hidden relative group/avatar">
-                        <TrainerSprite id={props.auth?.user?.avatar || tempProfile.avatar || props.profile.avatar || 'red'} className="w-full h-full object-contain scale-125 translate-y-2 drop-shadow-xl" />
+                        <TrainerSprite id={isEditingProfile ? tempProfile.avatar : (props.auth?.user?.avatar || props.profile.avatar || 'red')} className="w-full h-full object-contain scale-125 translate-y-2 drop-shadow-xl" />
                       </div>
-                      <div className="flex-1 text-center sm:text-left">
+                      <div className="flex-1 text-center sm:text-left w-full">
                         {isEditingProfile ? (
-                          <div className="space-y-6 max-w-lg mx-auto sm:mx-0">
-                            <input className="bg-slate-900 border border-emerald-500 text-white text-xl sm:text-2xl font-black p-4 rounded-xl sm:rounded-2xl w-full outline-none uppercase italic" value={tempProfile.name} onChange={e => setTempProfile({...tempProfile, name: e.target.value})} placeholder="Set Name" />
-                            <select className="bg-slate-900 border border-slate-700 text-white text-sm font-black p-4 rounded-xl sm:rounded-2xl w-full outline-none uppercase appearance-none" value={tempProfile.class} onChange={e => setTempProfile({...tempProfile, class: e.target.value})}>{TRAINER_CLASSES.map(cls => <option key={cls} value={cls}>{cls}</option>)}</select>
-                            <button onClick={() => { props.onUpdateProfile({...props.profile, name: tempProfile.name, trainerClass: tempProfile.class, avatar: tempProfile.avatar}); setIsEditingProfile(false); }} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl sm:rounded-2xl font-black uppercase text-xs sm:text-sm shadow-xl transition-all">Update Profile</button>
+                          <div className="space-y-6 w-full">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Trainer Name</label>
+                                <input className="bg-slate-900 border border-emerald-500 text-white text-lg font-black p-4 rounded-xl w-full outline-none uppercase italic" value={tempProfile.name} onChange={e => setTempProfile({...tempProfile, name: e.target.value})} placeholder="Set Name" />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Trainer Class</label>
+                                <select className="bg-slate-900 border border-slate-700 text-white text-sm font-black p-4 rounded-xl w-full outline-none uppercase appearance-none" value={tempProfile.class} onChange={e => setTempProfile({...tempProfile, class: e.target.value})}>{TRAINER_CLASSES.map(cls => <option key={cls} value={cls}>{cls}</option>)}</select>
+                              </div>
+                            </div>
+
+                            <div className="space-y-3">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Select Avatar</label>
+                              <div className="grid grid-cols-5 sm:grid-cols-8 gap-2 max-h-40 overflow-y-auto p-2 bg-slate-900 rounded-2xl border border-slate-800 scrollbar-thin">
+                                {TRAINER_AVATARS.map(avatar => (
+                                  <button 
+                                    key={avatar.id} 
+                                    onClick={() => setTempProfile({...tempProfile, avatar: avatar.id})}
+                                    className={`aspect-square rounded-lg border-2 transition-all flex items-center justify-center p-1 ${tempProfile.avatar === avatar.id ? 'border-emerald-500 bg-emerald-500/20 shadow-lg shadow-emerald-500/20' : 'border-slate-800 bg-slate-950 hover:border-slate-700'}`}
+                                    title={avatar.name}
+                                  >
+                                    <TrainerSprite id={avatar.id} className="w-full h-full object-contain" />
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="flex gap-3">
+                              <button onClick={() => setIsEditingProfile(false)} className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-black uppercase text-xs shadow-xl transition-all">Cancel</button>
+                              <button onClick={() => { props.onUpdateProfile({...props.profile, name: tempProfile.name, trainerClass: tempProfile.class, avatar: tempProfile.avatar}); setIsEditingProfile(false); }} className="flex-[2] py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black uppercase text-xs shadow-xl transition-all">Save Changes</button>
+                            </div>
                           </div>
                         ) : (
                           <>
