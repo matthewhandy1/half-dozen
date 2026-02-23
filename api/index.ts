@@ -23,76 +23,98 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = 3000;
 
-// Initialize Database (Lazy)
+// Initialize Database (Lazy & Thread-safe)
 let isDbInitialized = false;
+let dbInitPromise: Promise<void> | null = null;
+
 const initDb = async () => {
-  if (isDbInitialized || !process.env.POSTGRES_URL) return;
+  if (isDbInitialized) return;
+  if (dbInitPromise) return dbInitPromise;
   
-  try {
-    const client = await db.connect();
-    
-    // Users table
-    await client.sql`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT,
-        google_id TEXT UNIQUE,
-        name TEXT,
-        avatar TEXT,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
-
-    // Sync data table
-    await client.sql`
-      CREATE TABLE IF NOT EXISTS sync_data (
-        sync_id TEXT PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
-        data JSONB NOT NULL,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
-
-    // Migration
-    await client.sql`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sync_data' AND column_name='user_id') THEN
-          ALTER TABLE sync_data ADD COLUMN user_id INTEGER REFERENCES users(id);
-        END IF;
-      END $$;
-    `;
-
-    // Session table
-    await client.sql`
-      CREATE TABLE IF NOT EXISTS "session" (
-        "sid" varchar NOT NULL COLLATE "default",
-        "sess" json NOT NULL,
-        "expire" timestamp(6) NOT NULL
-      ) WITH (OIDS=FALSE);
+  dbInitPromise = (async () => {
+    if (!process.env.POSTGRES_URL) {
+      console.warn("POSTGRES_URL not found. Database features will be disabled.");
+      return;
+    }
+    try {
+      console.log("Initializing database tables...");
       
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'session_pkey') THEN
-          ALTER TABLE "session" ADD CONSTRAINT "session_pkey" PRIMARY KEY ("sid") NOT DEFERRABLE INITIALLY IMMEDIATE;
-        END IF;
-      END $$;
-      
-      CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
-    `;
+      // Users table
+      await db.sql`
+        CREATE TABLE IF NOT EXISTS users (
+          id SERIAL PRIMARY KEY,
+          email TEXT UNIQUE NOT NULL,
+          password TEXT,
+          google_id TEXT UNIQUE,
+          name TEXT,
+          avatar TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `;
 
-    isDbInitialized = true;
-    console.log("Database initialized.");
-  } catch (error) {
-    console.error("Database initialization failed:", error);
-  }
+      // Sync data table
+      await db.sql`
+        CREATE TABLE IF NOT EXISTS sync_data (
+          sync_id TEXT PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id),
+          data JSONB NOT NULL,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `;
+
+      // Migration
+      await db.sql`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sync_data' AND column_name='user_id') THEN
+            ALTER TABLE sync_data ADD COLUMN user_id INTEGER REFERENCES users(id);
+          END IF;
+        END $$;
+      `;
+
+      // Session table
+      await db.sql`
+        CREATE TABLE IF NOT EXISTS "session" (
+          "sid" varchar NOT NULL COLLATE "default",
+          "sess" json NOT NULL,
+          "expire" timestamp(6) NOT NULL
+        ) WITH (OIDS=FALSE);
+        
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'session_pkey') THEN
+            ALTER TABLE "session" ADD CONSTRAINT "session_pkey" PRIMARY KEY ("sid") NOT DEFERRABLE INITIALLY IMMEDIATE;
+          END IF;
+        END $$;
+        
+        CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+      `;
+
+      isDbInitialized = true;
+      console.log("Database initialized successfully.");
+    } catch (error) {
+      console.error("Database initialization failed:", error);
+      dbInitPromise = null; // Allow retry
+      throw error;
+    }
+  })();
+  
+  return dbInitPromise;
 };
 
 // Middleware to ensure DB is ready
 app.use(async (req, res, next) => {
-  if (!isDbInitialized && req.path.startsWith('/api')) {
-    await initDb();
+  if (req.path.startsWith('/api') && !isDbInitialized && req.path !== '/api/health') {
+    try {
+      // Set a timeout for DB init to prevent infinite hangs
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("DB Init Timeout")), 10000)
+      );
+      await Promise.race([initDb(), timeout]);
+    } catch (err) {
+      console.error("DB Init error in middleware:", err);
+      // We continue anyway, the specific route will fail if it needs the DB
+    }
   }
   next();
 });
@@ -140,8 +162,7 @@ app.post("/api/auth/signup", async (req, res) => {
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    const client = await db.connect();
-    const result = await client.sql`
+    const result = await db.sql`
       INSERT INTO users (email, password, name)
       VALUES (${email}, ${hashedPassword}, ${name || null})
       RETURNING id, email, name;
@@ -158,8 +179,7 @@ app.post("/api/auth/signup", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body;
   try {
-    const client = await db.connect();
-    const result = await client.sql`SELECT * FROM users WHERE email = ${email}`;
+    const result = await db.sql`SELECT * FROM users WHERE email = ${email}`;
     const user = result.rows[0];
 
     if (!user || !user.password || !(await bcrypt.compare(password, user.password))) {
@@ -176,8 +196,7 @@ app.post("/api/auth/login", async (req, res) => {
 app.get("/api/auth/me", async (req, res) => {
   if (!req.session.userId) return res.json({ user: null });
   try {
-    const client = await db.connect();
-    const result = await client.sql`SELECT id, email, name, avatar FROM users WHERE id = ${req.session.userId}`;
+    const result = await db.sql`SELECT id, email, name, avatar FROM users WHERE id = ${req.session.userId}`;
     res.json({ user: result.rows[0] });
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch user" });
@@ -265,8 +284,7 @@ app.post("/api/sync/save", async (req, res) => {
   }
 
   try {
-    const client = await db.connect();
-    await client.sql`
+    await db.sql`
       INSERT INTO sync_data (sync_id, user_id, data, updated_at)
       VALUES (${syncId}, ${userId}, ${JSON.stringify(data)}, CURRENT_TIMESTAMP)
       ON CONFLICT (sync_id) DO UPDATE
@@ -281,8 +299,7 @@ app.post("/api/sync/save", async (req, res) => {
 
 app.get("/api/sync/user", requireAuth, async (req, res) => {
   try {
-    const client = await db.connect();
-    const { rows } = await client.sql`
+    const { rows } = await db.sql`
       SELECT sync_id, data, updated_at FROM sync_data WHERE user_id = ${req.session.userId} ORDER BY updated_at DESC;
     `;
     res.json({ syncs: rows });
@@ -297,8 +314,7 @@ app.get("/api/sync/load/:id", async (req, res) => {
   }
   const { id } = req.params;
   try {
-    const client = await db.connect();
-    const { rows } = await client.sql`
+    const { rows } = await db.sql`
       SELECT data FROM sync_data WHERE sync_id = ${id};
     `;
     if (rows.length === 0) {
