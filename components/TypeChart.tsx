@@ -169,8 +169,8 @@ export const TypeChart: React.FC<TypeChartProps> = ({ team, generation, onReplac
   };
 
   return (
-    <div className="space-y-4">
-      <div className="bg-slate-900 rounded-3xl p-5 shadow-2xl border border-slate-800 w-full overflow-hidden">
+    <div className="space-y-4 h-full flex flex-col">
+      <div className="bg-slate-900 rounded-3xl p-5 shadow-2xl border border-slate-800 w-full overflow-hidden flex-1">
         <h2 className="text-sm sm:text-lg font-black text-slate-100 uppercase italic tracking-tight flex items-center gap-2 mb-4">
           <ShieldAlert className="w-4 h-4 text-red-500" /> Defensive Matrix
         </h2>
@@ -199,10 +199,9 @@ export const TypeChart: React.FC<TypeChartProps> = ({ team, generation, onReplac
                       <TypeTooltip type={type} generation={generation} visible={hoveredType === type} mode="defensive" isLast={rowIndex >= relevantTypes.length - 5} />
                     </td>
                     {team.map((p, i) => {
-                      if (!p) return <td key={i} className="p-0 border border-slate-800 bg-slate-900/20"></td>;
-                      const { multiplier } = getEffectivenessInfo(type, p);
+                      const multiplier = p ? getEffectivenessInfo(type, p).multiplier : 1;
                       return <td key={i} className="p-0 border border-slate-800 text-center bg-slate-900/20 text-[9px] sm:text-[11px] font-bold">
-                        {multiplier !== 1 && <span className={multiplier > 1 ? 'text-red-400' : multiplier === 0 ? 'text-indigo-400' : 'text-emerald-400'}>{multiplier === 0 ? '0' : multiplier === 0.5 ? '½' : multiplier === 0.25 ? '¼' : `${multiplier}x`}</span>}
+                        {p && multiplier !== 1 && <span className={multiplier > 1 ? 'text-red-400' : multiplier === 0 ? 'text-indigo-400' : 'text-emerald-400'}>{multiplier === 0 ? '0' : multiplier === 0.5 ? '½' : multiplier === 0.25 ? '¼' : `${multiplier}x`}</span>}
                       </td>;
                     })}
                     <td className="p-0 border border-slate-800 bg-slate-950 text-center">

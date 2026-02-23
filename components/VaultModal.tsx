@@ -431,12 +431,17 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
                           </div>
                         ) : (
                           <>
-                            <div className="flex items-center justify-center sm:justify-start gap-4 mb-2">
+                            <div className="flex items-center justify-center sm:justify-start gap-4 mb-1">
                               <h2 className="text-3xl sm:text-5xl font-black text-white uppercase italic tracking-tighter">
                                 {props.auth?.user?.name || props.profile.name}
                               </h2>
                               <button onClick={() => { setTempProfile({name: props.profile.name, class: props.profile.trainerClass, avatar: props.profile.avatar}); setIsEditingProfile(true); }} className="p-2 text-slate-600 hover:text-emerald-400 transition-colors"><Edit3 className="w-6 h-6" /></button>
                             </div>
+                            {props.auth?.user?.email && (
+                              <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 italic">
+                                {props.auth.user.email}
+                              </p>
+                            )}
                             <div className="inline-flex items-center px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-full">
                               <p className="text-emerald-400 font-black uppercase tracking-[0.2em] text-[10px] sm:text-xs italic">
                                 {props.auth?.user ? 'Architect Account' : props.profile.trainerClass}

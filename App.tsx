@@ -214,6 +214,13 @@ const App: React.FC = () => {
   const handleAuthSuccess = async (user: User) => {
     setAuth({ user, loading: false });
     setShowMigrationPrompt(false);
+    
+    // Wipe local storage keys to prevent interference with cloud account
+    localStorage.removeItem('half-dozen-teams');
+    localStorage.removeItem('half-dozen-box');
+    localStorage.removeItem('half-dozen-enemy-teams');
+    localStorage.removeItem('half-dozen-profile');
+    
     isInitialLoading.current = true;
     await fetchLatestCloudData();
   };
@@ -393,10 +400,13 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    localStorage.setItem('half-dozen-box', JSON.stringify(box));
-    localStorage.setItem('half-dozen-teams', JSON.stringify(teams));
-    localStorage.setItem('half-dozen-enemy-teams', JSON.stringify(enemyTeams));
-    localStorage.setItem('half-dozen-profile', JSON.stringify(profile));
+    // Only save to local storage if NOT logged in
+    if (!auth.user) {
+      localStorage.setItem('half-dozen-box', JSON.stringify(box));
+      localStorage.setItem('half-dozen-teams', JSON.stringify(teams));
+      localStorage.setItem('half-dozen-enemy-teams', JSON.stringify(enemyTeams));
+      localStorage.setItem('half-dozen-profile', JSON.stringify(profile));
+    }
     
     // Auto-sync to cloud if logged in and not currently loading initial data
     if (auth.user && !isInitialLoading.current) {
@@ -647,17 +657,17 @@ const App: React.FC = () => {
                 </button>
               )}
 
-              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl">
-              <Layers className="w-3.5 h-3.5 text-indigo-400" />
+            <div className="hidden md:flex items-center gap-2 px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors">
+              <Layers className="w-3 h-3 text-indigo-400" />
               <select 
                 value={selectedGen} 
                 onChange={(e) => { 
                   setSelectedGen(Number(e.target.value)); 
                 }}
-                className="bg-transparent text-[10px] font-black uppercase text-slate-300 outline-none cursor-pointer"
+                className="bg-transparent text-[9px] font-black uppercase text-slate-300 outline-none cursor-pointer pr-1"
               >
                 {GENERATIONS.map(g => (
-                  <option key={g.id} value={g.id} className="bg-slate-900 text-white">{g.name} ({g.region})</option>
+                  <option key={g.id} value={g.id} className="bg-slate-900 text-white">{g.name}</option>
                 ))}
               </select>
             </div>
@@ -777,9 +787,7 @@ const App: React.FC = () => {
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 sm:gap-8">
           <TypeChart team={team} generation={selectedGen} onReplace={handleReplacePokemon} />
-          <div className="flex flex-col gap-8">
-            <OffensiveMatrix team={team} generation={selectedGen} onReplace={handleReplacePokemon} />
-          </div>
+          <OffensiveMatrix team={team} generation={selectedGen} onReplace={handleReplacePokemon} />
         </div>
 
         <EnemyTeamSection 

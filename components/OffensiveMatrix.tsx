@@ -142,8 +142,8 @@ export const OffensiveMatrix: React.FC<OffensiveMatrixProps> = ({ team, generati
   };
 
   return (
-    <div className="space-y-4">
-      <div className="bg-slate-900 rounded-3xl p-5 shadow-2xl border border-slate-800 w-full overflow-hidden">
+    <div className="space-y-4 h-full flex flex-col">
+      <div className="bg-slate-900 rounded-3xl p-5 shadow-2xl border border-slate-800 w-full overflow-hidden flex-1">
         <h2 className="text-sm sm:text-lg font-black text-slate-100 uppercase italic tracking-tight flex items-center gap-2 mb-4">
           <Sword className="w-4 h-4 text-emerald-500" /> Offensive Matrix
         </h2>
