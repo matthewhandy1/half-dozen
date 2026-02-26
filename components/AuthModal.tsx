@@ -18,6 +18,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
+  const [website, setWebsite] = useState(''); // Honeypot field
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,7 +60,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     }
 
     const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/signup';
-    const body = mode === 'login' ? { email, password } : { email, password, name };
+    const body = mode === 'login' ? { email, password } : { email, password, name, website };
 
     try {
       const res = await fetch(endpoint, {
@@ -158,6 +159,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 </div>
               </div>
             )}
+
+            {/* Honeypot field - hidden from users */}
+            <div className="hidden" aria-hidden="true">
+              <input 
+                type="text" 
+                name="website" 
+                value={website} 
+                onChange={(e) => setWebsite(e.target.value)} 
+                tabIndex={-1} 
+                autoComplete="off"
+              />
+            </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider ml-1">Email Address</label>

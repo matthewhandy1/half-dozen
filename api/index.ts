@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { GoogleGenAI } from "@google/genai";
 import { Resend } from "resend";
@@ -8,6 +9,8 @@ import dotenv from "dotenv";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import * as bcrypt from "bcryptjs";
+import helmet from "helmet";
+import { rateLimit } from "express-rate-limit";
 
 dotenv.config();
 
@@ -22,6 +25,42 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const PORT = 3000;
+
+// Security Headers
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  frameguard: false,
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      "img-src": ["'self'", "data:", "https://raw.githubusercontent.com", "https://play.pokemonshowdown.com", "https://picsum.photos", "https://*.googleusercontent.com"],
+      "connect-src": ["*"],
+      "frame-ancestors": ["'self'", "https://*.google.com", "https://*.run.app"],
+      "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://*", "http://*"],
+    },
+  },
+}));
+
+// Rate Limiting
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Very high limit for dev
+  message: { error: "Too many attempts, please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => process.env.NODE_ENV !== 'production',
+});
+
+const contactLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 50, // Very high limit
+  message: { error: "Too many messages, please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => process.env.NODE_ENV !== 'production',
+});
 
 // Initialize Database (Lazy & Thread-safe)
 let isDbInitialized = false;
@@ -49,7 +88,7 @@ const initDb = async () => {
           name TEXT,
           avatar TEXT,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        );
+        )
       `;
 
       // Sync data table
@@ -59,7 +98,7 @@ const initDb = async () => {
           user_id INTEGER REFERENCES users(id),
           data JSONB NOT NULL,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        );
+        )
       `;
 
       // Migration
@@ -69,7 +108,7 @@ const initDb = async () => {
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sync_data' AND column_name='user_id') THEN
             ALTER TABLE sync_data ADD COLUMN user_id INTEGER REFERENCES users(id);
           END IF;
-        END $$;
+        END $$
       `;
 
       // Session table
@@ -78,16 +117,20 @@ const initDb = async () => {
           "sid" varchar NOT NULL COLLATE "default",
           "sess" json NOT NULL,
           "expire" timestamp(6) NOT NULL
-        ) WITH (OIDS=FALSE);
-        
+        ) WITH (OIDS=FALSE)
+      `;
+      
+      await db.sql`
         DO $$
         BEGIN
           IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'session_pkey') THEN
             ALTER TABLE "session" ADD CONSTRAINT "session_pkey" PRIMARY KEY ("sid") NOT DEFERRABLE INITIALLY IMMEDIATE;
           END IF;
-        END $$;
-        
-        CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+        END $$
+      `;
+      
+      await db.sql`
+        CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire")
       `;
 
       isDbInitialized = true;
@@ -106,16 +149,8 @@ app.use(express.json({ limit: '10mb' }));
 
 // Middleware to ensure DB is ready - MUST be before session
 app.use(async (req, res, next) => {
-  if (req.path.startsWith('/api') && !isDbInitialized && req.path !== '/api/health') {
-    try {
-      const timeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("DB Init Timeout")), 10000)
-      );
-      await Promise.race([initDb(), timeout]);
-    } catch (err) {
-      console.error("DB Init error in middleware:", err);
-    }
-  }
+  // DB is now initialized on startup, but we keep the middleware for safety
+  // with a much shorter check if needed, or just next()
   next();
 });
 
@@ -154,8 +189,15 @@ const requireAuth = (req: any, res: any, next: any) => {
 };
 
 // Auth Routes
-app.post("/api/auth/signup", async (req, res) => {
-  const { email, password, name } = req.body;
+app.post("/api/auth/signup", authLimiter, async (req, res) => {
+  const { email, password, name, website } = req.body;
+  
+  // Honeypot check
+  if (website) {
+    console.log("Bot detected in signup honeypot");
+    return res.status(201).json({ user: { id: 0, email: "bot@detected.com", name: "Bot" } });
+  }
+
   if (!email || !password) return res.status(400).json({ error: "Email and password required" });
 
   try {
@@ -174,7 +216,7 @@ app.post("/api/auth/signup", async (req, res) => {
   }
 });
 
-app.post("/api/auth/login", async (req, res) => {
+app.post("/api/auth/login", authLimiter, async (req, res) => {
   const { email, password } = req.body;
   try {
     const result = await db.sql`SELECT * FROM users WHERE email = ${email}`;
@@ -208,8 +250,15 @@ app.post("/api/auth/logout", (req, res) => {
 });
 
 // API Routes
-app.post("/api/contact", async (req, res) => {
-  const { name, email, message } = req.body;
+app.post("/api/contact", contactLimiter, async (req, res) => {
+  const { name, email, message, website } = req.body;
+
+  // Honeypot check
+  if (website) {
+    console.log("Bot detected in contact honeypot");
+    return res.status(200).json({ success: true, data: { id: "bot" } });
+  }
+
   const resendKey = process.env.RESEND_API_KEY;
 
   if (!resendKey) {
@@ -330,20 +379,38 @@ app.use((err: any, req: any, res: any, next: any) => {
 });
 
 // Setup Vite or Static serving
-if (process.env.NODE_ENV !== "production") {
-  const setupDev = async () => {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
+async function startServer() {
+  // Initialize DB on startup
+  try {
+    await initDb();
+  } catch (err) {
+    console.error("Critical: Initial DB initialization failed:", err);
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+      console.log("Vite middleware loaded");
+    } catch (err) {
+      console.error("Failed to load Vite middleware:", err);
+    }
+  } else {
+    app.use(express.static(path.resolve(__dirname, "..", "dist")));
+    app.get("*", (req, res) => {
+      res.sendFile(path.resolve(__dirname, "..", "dist", "index.html"));
     });
-    app.use(vite.middlewares);
-    
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-  };
-  setupDev();
+  }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
 }
+
+startServer();
 
 export default app;

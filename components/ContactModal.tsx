@@ -10,7 +10,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    message: ''
+    message: '',
+    website: '' // Honeypot
   });
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
 
@@ -34,7 +35,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
       }
       
       setStatus('success');
-      setFormData({ name: '', email: '', message: '' });
+      setFormData({ name: '', email: '', message: '', website: '' });
     } catch (error: any) {
       console.error("Contact form error:", error);
       alert(`Error: ${error.message}`);
@@ -76,6 +77,18 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Honeypot field - hidden from users */}
+              <div className="hidden" aria-hidden="true">
+                <input 
+                  type="text" 
+                  name="website" 
+                  value={formData.website} 
+                  onChange={e => setFormData({...formData, website: e.target.value})} 
+                  tabIndex={-1} 
+                  autoComplete="off"
+                />
+              </div>
+
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                   <User className="w-3 h-3" /> Name (Optional)

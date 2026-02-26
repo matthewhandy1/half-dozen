@@ -129,7 +129,7 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({
 
   return (
     <>
-      <div className="flex flex-col h-full group/card relative z-0 hover:z-50" ref={dropdownRef}>
+      <div className={`flex flex-col h-full group/card relative transition-all duration-300 ${isPkmnOpen ? 'z-[100]' : 'z-0 lg:hover:z-50'}`} ref={dropdownRef}>
         <div className={`bg-slate-900 rounded-[2rem] shadow-xl border border-slate-800 transition-all duration-300 w-full h-full flex flex-col ${saving ? 'ring-2 ring-emerald-500' : ''}`} style={cardBackgroundStyle}>
           {!pokemon ? (
             <div className="p-6 flex-1 flex flex-col items-center justify-center">
@@ -137,8 +137,25 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({
               <div className="w-full relative z-10">
                 <input type="text" placeholder="Add Pokemon" className="w-full px-4 py-4 rounded-2xl bg-slate-950 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-slate-100 font-bold text-[10px] sm:text-xs uppercase text-center italic" value={searchTerm} onFocus={() => setIsPkmnOpen(true)} onChange={(e) => { setSearchTerm(e.target.value); setIsPkmnOpen(true); }} onKeyDown={handleKeyDown} />
                 {isPkmnOpen && filteredPkmn.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 rounded-xl shadow-2xl border border-slate-700 z-[110] max-h-40 overflow-y-auto scrollbar-thin">
-                    {filteredPkmn.map((p, idx) => (<button key={p.id} onClick={() => handleSearch(p.id)} className={`w-full text-left px-4 py-3 border-b border-slate-800 last:border-0 font-bold text-xs uppercase transition-colors ${idx === highlightedIndex ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800'}`}>{p.name}</button>))}
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 rounded-xl shadow-2xl border border-slate-700 z-[110] max-h-64 overflow-y-auto scrollbar-thin divide-y divide-slate-800">
+                    {filteredPkmn.map((p, idx) => (
+                      <button 
+                        key={p.id} 
+                        onClick={() => handleSearch(p.id)} 
+                        className={`w-full text-left px-4 py-3 flex items-center gap-3 font-bold text-xs uppercase transition-colors ${idx === highlightedIndex ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+                      >
+                        <div className="hidden sm:flex w-8 h-8 flex-shrink-0 items-center justify-center overflow-hidden">
+                          <img 
+                            src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`} 
+                            alt={p.name}
+                            className="w-10 h-10 object-contain max-w-none"
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                        <span className="truncate">{p.name}</span>
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
