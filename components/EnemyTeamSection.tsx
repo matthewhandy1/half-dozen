@@ -2,9 +2,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PokemonTeam, PokemonData } from '../types';
 import { getChartForGen, getTypesForGen, TYPE_COLORS } from '../constants';
-import { Search, X, ShieldAlert, Loader2, Save, FolderOpen, Sword, Check, AlertCircle, Trash2 } from 'lucide-react';
+import { Search, X, ShieldAlert, Loader2, Save, FolderOpen, Sword, Check, AlertCircle, Trash2, LayoutGrid } from 'lucide-react';
 import { fetchPokemonBasic } from '../services/pokeApi';
 import { TrainerSprite } from './PokemonSharedUI';
+import { PokemonPickerModal } from './PokemonPickerModal';
 
 interface EnemyTeamSectionProps {
   userTeam: PokemonTeam;
@@ -151,7 +152,7 @@ export const EnemyTeamSection: React.FC<EnemyTeamSectionProps> = ({
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-8 sm:mb-12">
         {enemyTeam.map((p, i) => (
-          <EnemyPokemonSelector key={i} index={i} pokemon={p} onSelect={onSelectEnemy} pokemonList={pokemonList} />
+          <EnemyPokemonSelector key={i} index={i} pokemon={p} onSelect={onSelectEnemy} pokemonList={pokemonList} generation={generation} />
         ))}
       </div>
 
@@ -165,27 +166,16 @@ const EnemyPokemonSelector: React.FC<{
   pokemon: PokemonData | null;
   onSelect: (index: number, pokemon: PokemonData | null) => void;
   pokemonList: { name: string; id: number }[];
-}> = ({ index, pokemon, onSelect, pokemonList }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState('');
+  generation: number;
+}> = ({ index, pokemon, onSelect, pokemonList, generation }) => {
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const clickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setIsOpen(false);
-    };
-    document.addEventListener('mousedown', clickOutside);
-    return () => document.removeEventListener('mousedown', clickOutside);
-  }, []);
 
   const handlePick = async (id: number) => {
     setLoading(true);
     setError(false);
-    setIsOpen(false);
+    setIsPickerOpen(false);
     try {
       const data = await fetchPokemonBasic(id);
       onSelect(index, data);
@@ -196,19 +186,22 @@ const EnemyPokemonSelector: React.FC<{
     }
   };
 
-  const filtered = pokemonList.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).slice(0, 15);
-
   return (
-    <div className={`relative group transition-all duration-300 ${isOpen ? 'z-[100]' : 'z-0 lg:hover:z-50'}`} ref={dropdownRef}>
+    <div className={`relative group transition-all duration-300 z-0 lg:hover:z-50`}>
       {!pokemon ? (
         <div className="bg-slate-900 border-2 border-dashed border-slate-800 rounded-xl sm:rounded-2xl p-3 sm:p-4 h-32 sm:h-40 flex flex-col items-center justify-center transition-all hover:border-red-500/50">
           {loading ? (
             <Loader2 className="w-6 h-6 animate-spin text-red-500" />
           ) : (
-            <>
-              <button onClick={() => {setIsOpen(true); setHighlightedIndex(0);}} className="w-8 h-8 sm:w-10 sm:h-10 bg-slate-800 rounded-full flex items-center justify-center text-slate-500 mb-2 hover:bg-red-500 hover:text-white transition-all"><Search className="w-4 h-4 sm:w-5 sm:h-5" /></button>
+            <div className="flex flex-col items-center gap-2">
+              <button 
+                onClick={() => setIsPickerOpen(true)}
+                className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-800 rounded-full flex items-center justify-center text-slate-500 hover:bg-red-500 hover:text-white transition-all shadow-lg group/scout"
+              >
+                <Search className="w-5 h-5 group-hover/scout:scale-110 transition-transform" />
+              </button>
               <span className="text-[9px] sm:text-[10px] font-black text-slate-700 uppercase tracking-widest leading-none">Scout {index + 1}</span>
-            </>
+            </div>
           )}
         </div>
       ) : (
@@ -219,31 +212,12 @@ const EnemyPokemonSelector: React.FC<{
         </div>
       )}
 
-      {isOpen && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-[150] overflow-hidden divide-y divide-slate-800">
-          <input autoFocus className="w-full bg-slate-950 p-3 text-[10px] sm:text-xs font-bold text-white outline-none border-b border-slate-800" placeholder="Search..." value={search} onChange={e => {setSearch(e.target.value); setHighlightedIndex(0);}} />
-          <div className="max-h-64 overflow-y-auto scrollbar-thin">
-            {filtered.map((p, idx) => (
-              <button 
-                key={p.id} 
-                onClick={() => handlePick(p.id)} 
-                className={`w-full text-left px-4 py-2.5 flex items-center gap-3 font-bold uppercase transition-colors ${highlightedIndex === idx ? 'bg-red-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}
-              >
-                <div className="hidden sm:flex w-8 h-8 flex-shrink-0 items-center justify-center overflow-hidden">
-                  <img 
-                    src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`} 
-                    alt={p.name}
-                    className="w-10 h-10 object-contain max-w-none"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-                <span className="text-[10px] truncate">{p.name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      <PokemonPickerModal
+        isOpen={isPickerOpen}
+        onClose={() => setIsPickerOpen(false)}
+        onSelect={(id) => { handlePick(id); setIsPickerOpen(false); }}
+        pokemonList={pokemonList}
+      />
     </div>
   );
 };

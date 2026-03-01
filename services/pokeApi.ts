@@ -234,6 +234,43 @@ export async function fetchAllMoves(): Promise<string[]> {
   return data.results.map((r: any) => formatName(r.name)).sort();
 }
 
+export async function fetchAllAbilities(): Promise<string[]> {
+  const response = await fetch('https://pokeapi.co/api/v2/ability?limit=1000');
+  const data = await response.json();
+  return data.results.map((r: any) => formatName(r.name)).sort();
+}
+
+export async function fetchPokemonByType(type: string): Promise<{ name: string; id: number }[]> {
+  const response = await fetch(`https://pokeapi.co/api/v2/type/${type.toLowerCase()}`);
+  if (!response.ok) return [];
+  const data = await response.json();
+  return data.pokemon.map((p: any) => {
+    const id = parseInt(p.pokemon.url.split('/').filter(Boolean).pop() || '0');
+    return { name: formatName(p.pokemon.name), id };
+  });
+}
+
+export async function fetchPokemonByAbility(ability: string): Promise<{ name: string; id: number }[]> {
+  const formattedAbility = ability.toLowerCase().replace(/\s+/g, '-');
+  const response = await fetch(`https://pokeapi.co/api/v2/ability/${formattedAbility}`);
+  if (!response.ok) return [];
+  const data = await response.json();
+  return data.pokemon.map((p: any) => {
+    const id = parseInt(p.pokemon.url.split('/').filter(Boolean).pop() || '0');
+    return { name: formatName(p.pokemon.name), id };
+  });
+}
+
+export async function fetchPokemonByGeneration(genId: number): Promise<{ name: string; id: number }[]> {
+  const response = await fetch(`https://pokeapi.co/api/v2/generation/${genId}`);
+  if (!response.ok) return [];
+  const data = await response.json();
+  return data.pokemon_species.map((p: any) => {
+    const id = parseInt(p.url.split('/').filter(Boolean).pop() || '0');
+    return { name: formatName(p.name), id };
+  });
+}
+
 export async function fetchAllItems(): Promise<string[]> {
   const categoryIds = [3, 12, 13, 19];
   try {

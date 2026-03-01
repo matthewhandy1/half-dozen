@@ -165,7 +165,13 @@ const App: React.FC = () => {
         const latest = syncs[0]; // Ordered by updated_at DESC
         const decoded = latest.data;
         
-        if (decoded.profile) setProfile(decoded.profile);
+        if (decoded.profile) {
+          setProfile(decoded.profile);
+          setAuth(prev => ({
+            ...prev,
+            user: prev.user ? { ...prev.user, name: decoded.profile.name, avatar: decoded.profile.avatar } : null
+          }));
+        }
         if (decoded.team) setTeam(decoded.team);
         if (decoded.box) setBox(decoded.box);
         if (decoded.teams) setTeams(decoded.teams);
@@ -940,7 +946,15 @@ const App: React.FC = () => {
           enemyTeams={enemyTeams}
           auth={auth}
           onClose={() => setVaultState({...vaultState, open: false})}
-          onUpdateProfile={setProfile}
+          onUpdateProfile={(newProfile) => {
+            setProfile(newProfile);
+            if (auth.user) {
+              setAuth(prev => ({
+                ...prev,
+                user: prev.user ? { ...prev.user, name: newProfile.name, avatar: newProfile.avatar } : null
+              }));
+            }
+          }}
           onDeleteTeam={handleDeleteTeam}
           onRenameTeam={handleRenameTeam}
           onLoadTeam={handleLoadTeam}

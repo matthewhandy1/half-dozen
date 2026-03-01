@@ -2,10 +2,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PokemonData, MoveDetails, SelectedMove } from '../types';
 import { POKEMON_TYPES, TYPE_COLORS } from '../constants';
-import { Search, X, Edit3, Disc, Check, Settings2, Zap, ShieldCheck, Trash2, PackagePlus, Info, Fingerprint, Save, Loader2 } from 'lucide-react';
+import { Search, X, Edit3, Disc, Check, Settings2, Zap, ShieldCheck, Trash2, PackagePlus, Info, Fingerprint, Save, Loader2, LayoutGrid } from 'lucide-react';
 import { fetchPokemon, fetchMoveDetails } from '../services/pokeApi';
 import { ControlTooltip, AbilityTooltip } from './PokemonSharedUI';
 import { MoveSearchSelector } from './PokemonSelectors';
+import { PokemonPickerModal } from './PokemonPickerModal';
 
 interface PokemonCardProps {
   index: number;
@@ -27,55 +28,19 @@ const INFLUENTIAL_ABILITIES = [
 export const PokemonCard: React.FC<PokemonCardProps> = ({ 
   index, pokemon, onSelect, onSaveToBox, pokemonList, allMovesList, generation 
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isPkmnOpen, setIsPkmnOpen] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isArchitectOpen, setIsArchitectOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tempNickname, setTempNickname] = useState('');
   
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const supportsAbilities = generation >= 3;
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsPkmnOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const handleSearch = async (val: string | number) => {
     try {
       const data = await fetchPokemon(val);
       onSelect(index, data);
-      setIsPkmnOpen(false);
-      setSearchTerm('');
-      setHighlightedIndex(0);
+      setIsPickerOpen(false);
     } catch (err) { console.error(err); }
-  };
-
-  const filteredPkmn = pokemonList.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).slice(0, 20);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!isPkmnOpen) {
-      if (e.key === 'ArrowDown' || e.key === 'Enter') setIsPkmnOpen(true);
-      return;
-    }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setHighlightedIndex(prev => (prev + 1) % filteredPkmn.length);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setHighlightedIndex(prev => (prev - 1 + filteredPkmn.length) % filteredPkmn.length);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (filteredPkmn[highlightedIndex]) handleSearch(filteredPkmn[highlightedIndex].id);
-    } else if (e.key === 'Escape') {
-      setIsPkmnOpen(false);
-    }
   };
 
   const handleToggleAbility = (abilityName: string) => {
@@ -129,36 +94,18 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({
 
   return (
     <>
-      <div className={`flex flex-col h-full group/card relative transition-all duration-300 ${isPkmnOpen ? 'z-[100]' : 'z-0 lg:hover:z-50'}`} ref={dropdownRef}>
+      <div className={`flex flex-col h-full group/card relative transition-all duration-300 z-0 lg:hover:z-50`}>
         <div className={`bg-slate-900 rounded-[2rem] shadow-xl border border-slate-800 transition-all duration-300 w-full h-full flex flex-col ${saving ? 'ring-2 ring-emerald-500' : ''}`} style={cardBackgroundStyle}>
           {!pokemon ? (
             <div className="p-6 flex-1 flex flex-col items-center justify-center">
               <p className="text-slate-600 font-black uppercase tracking-[0.2em] text-[10px] mb-4 italic">Slot {index + 1}</p>
-              <div className="w-full relative z-10">
-                <input type="text" placeholder="Add Pokemon" className="w-full px-4 py-4 rounded-2xl bg-slate-950 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-slate-100 font-bold text-[10px] sm:text-xs uppercase text-center italic" value={searchTerm} onFocus={() => setIsPkmnOpen(true)} onChange={(e) => { setSearchTerm(e.target.value); setIsPkmnOpen(true); }} onKeyDown={handleKeyDown} />
-                {isPkmnOpen && filteredPkmn.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 rounded-xl shadow-2xl border border-slate-700 z-[110] max-h-64 overflow-y-auto scrollbar-thin divide-y divide-slate-800">
-                    {filteredPkmn.map((p, idx) => (
-                      <button 
-                        key={p.id} 
-                        onClick={() => handleSearch(p.id)} 
-                        className={`w-full text-left px-4 py-3 flex items-center gap-3 font-bold text-xs uppercase transition-colors ${idx === highlightedIndex ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
-                      >
-                        <div className="hidden sm:flex w-8 h-8 flex-shrink-0 items-center justify-center overflow-hidden">
-                          <img 
-                            src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`} 
-                            alt={p.name}
-                            className="w-10 h-10 object-contain max-w-none"
-                            loading="lazy"
-                            referrerPolicy="no-referrer"
-                          />
-                        </div>
-                        <span className="truncate">{p.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <button 
+                onClick={() => setIsPickerOpen(true)}
+                className="w-full flex items-center justify-center gap-3 px-6 py-5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-900 text-slate-400 hover:text-white transition-all group/btn shadow-lg"
+              >
+                <PackagePlus className="w-5 h-5 text-indigo-500 group-hover/btn:scale-110 transition-transform" />
+                <span className="font-black text-xs uppercase italic tracking-widest">Add Pokemon</span>
+              </button>
             </div>
           ) : (
             <div className="flex-1 flex flex-col relative p-4 gap-1 h-full cursor-pointer lg:cursor-default items-center" onClick={() => { if(window.innerWidth < 1024) openArchitect(); }}>
@@ -201,6 +148,13 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({
           )}
         </div>
       </div>
+
+      <PokemonPickerModal
+        isOpen={isPickerOpen}
+        onClose={() => setIsPickerOpen(false)}
+        onSelect={(id) => { handleSearch(id); setIsPickerOpen(false); }}
+        pokemonList={pokemonList}
+      />
 
       {isArchitectOpen && pokemon && (
         <div className="fixed inset-0 z-[400] bg-slate-950 flex flex-col animate-in slide-in-from-bottom duration-300">
