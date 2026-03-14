@@ -87,8 +87,19 @@ const initDb = async () => {
           google_id TEXT UNIQUE,
           name TEXT,
           avatar TEXT,
+          is_premium BOOLEAN DEFAULT FALSE,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         )
+      `;
+
+      // Migration for is_premium
+      await db.sql`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='is_premium') THEN
+            ALTER TABLE users ADD COLUMN is_premium BOOLEAN DEFAULT FALSE;
+          END IF;
+        END $$
       `;
 
       // Sync data table
@@ -154,9 +165,8 @@ app.use(async (req, res, next) => {
   next();
 });
 
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1);
-}
+// Trust proxy for Cloud Run/Iframe environment
+app.set('trust proxy', 1);
 
 // Session Middleware
 const sessionConfig: session.SessionOptions = {
@@ -164,8 +174,9 @@ const sessionConfig: session.SessionOptions = {
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: true, // Required for SameSite=None
+    sameSite: 'none', // Required for cross-origin iframe
+    partitioned: true, // Enable CHIPS for modern browser iframe support
     maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
   }
 };
@@ -183,6 +194,7 @@ app.use(session(sessionConfig));
 // Auth Middleware
 const requireAuth = (req: any, res: any, next: any) => {
   if (!req.session.userId) {
+    console.warn(`Unauthorized access attempt to ${req.url}. SessionID: ${req.sessionID}`);
     return res.status(401).json({ error: "Unauthorized" });
   }
   next();
@@ -209,9 +221,16 @@ app.post("/api/auth/signup", authLimiter, async (req, res) => {
     `;
     const user = result.rows[0];
     req.session.userId = user.id;
-    res.status(201).json({ user });
+    req.session.save((err) => {
+      if (err) {
+        console.error("Session save error during signup:", err);
+        return res.status(500).json({ error: "Signup failed" });
+      }
+      res.status(201).json({ user: { id: user.id, email: user.email, name: user.name } });
+    });
   } catch (error: any) {
     if (error.code === '23505') return res.status(400).json({ error: "Email already exists" });
+    console.error("Signup error:", error);
     res.status(500).json({ error: "Signup failed" });
   }
 });
@@ -227,18 +246,32 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
     }
 
     req.session.userId = user.id;
-    res.json({ user: { id: user.id, email: user.email, name: user.name, avatar: user.avatar } });
+    req.session.save((err) => {
+      if (err) {
+        console.error("Session save error during login:", err);
+        return res.status(500).json({ error: "Login failed" });
+      }
+      res.json({ user: { id: user.id, email: user.email, name: user.name, avatar: user.avatar } });
+    });
   } catch (error) {
+    console.error("Login error:", error);
     res.status(500).json({ error: "Login failed" });
   }
 });
 
 app.get("/api/auth/me", async (req, res) => {
+  console.log(`Auth Check - SessionID: ${req.sessionID}, UserId: ${req.session.userId}`);
   if (!req.session.userId) return res.json({ user: null });
   try {
     const result = await db.sql`SELECT id, email, name, avatar FROM users WHERE id = ${req.session.userId}`;
-    res.json({ user: result.rows[0] });
+    if (result.rows.length === 0) {
+      console.warn(`User ${req.session.userId} found in session but not in DB`);
+      return res.json({ user: null });
+    }
+    const user = result.rows[0];
+    res.json({ user: { id: user.id, email: user.email, name: user.name, avatar: user.avatar } });
   } catch (error) {
+    console.error("Auth Me Error:", error);
     res.status(500).json({ error: "Failed to fetch user" });
   }
 });
@@ -364,7 +397,12 @@ app.get("/api/sync/load/:id", async (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", env: process.env.NODE_ENV });
+  res.json({ 
+    status: "ok", 
+    env: process.env.NODE_ENV,
+    database: process.env.POSTGRES_URL ? "configured" : "missing",
+    dbInitialized: isDbInitialized
+  });
 });
 
 // JSON 404 for API routes

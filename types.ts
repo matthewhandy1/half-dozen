@@ -47,6 +47,7 @@ export interface PokemonData {
   selectedItemDescription?: string;
   customTypes?: string[]; 
   speciesColor?: string;
+  speciesName?: string;
   dominantColors?: string[];
 }
 

@@ -99,9 +99,29 @@ async function getDominantColors(imageUrl: string): Promise<string[]> {
 }
 
 /**
+ * Maps generation IDs to PokeAPI version group names.
+ */
+const GEN_TO_VERSION_GROUPS: Record<number, string[]> = {
+  1: ['red-blue', 'yellow'],
+  2: ['gold-silver', 'crystal'],
+  3: ['ruby-sapphire', 'emerald', 'firered-leafgreen'],
+  4: ['diamond-pearl', 'platinum', 'heartgold-soulsilver'],
+  5: ['black-white', 'black-2-white-2'],
+  6: ['x-y', 'omega-ruby-alpha-sapphire'],
+  7: ['sun-moon', 'ultra-sun-ultra-moon', 'lets-go-pikachu-lets-go-eevee'],
+  8: ['sword-shield', 'brilliant-diamond-shining-pearl', 'legends-arceus'],
+  9: ['scarlet-violet'],
+  10: ['firered-leafgreen'], // FRLG
+  11: ['heartgold-soulsilver'], // HGSS
+  12: ['omega-ruby-alpha-sapphire'], // ORAS
+  13: ['lets-go-pikachu-lets-go-eevee'], // LGPE
+  14: ['brilliant-diamond-shining-pearl'], // BDSP
+};
+
+/**
  * Full fetch for the active team cards.
  */
-export async function fetchPokemon(identifier: string | number): Promise<PokemonData> {
+export async function fetchPokemon(identifier: string | number, genId: number = 9): Promise<PokemonData> {
   const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${identifier.toString().toLowerCase()}`);
   if (!response.ok) {
     throw new Error('Pokemon not found');
@@ -138,6 +158,18 @@ export async function fetchPokemon(identifier: string | number): Promise<Pokemon
   const abilities = await Promise.all(abilityPromises);
   const spriteUrl = data.sprites.other['official-artwork'].front_default || data.sprites.front_default;
   const dominantColors = await getDominantColors(spriteUrl);
+  const speciesName = data.species.name;
+
+  // Filter moves by generation
+  const versionGroups = GEN_TO_VERSION_GROUPS[genId] || ['scarlet-violet'];
+  const availableMoves = data.moves
+    .filter((m: any) => 
+      m.version_group_details.some((detail: any) => 
+        versionGroups.includes(detail.version_group.name)
+      )
+    )
+    .map((m: any) => formatName(m.move.name))
+    .sort();
 
   return {
     id: data.id,
@@ -152,13 +184,14 @@ export async function fetchPokemon(identifier: string | number): Promise<Pokemon
       value: s.base_stat,
     })),
     abilities: abilities,
-    availableMoves: data.moves.map((m: any) => formatName(m.move.name)).sort(),
+    availableMoves: availableMoves.length > 0 ? availableMoves : data.moves.map((m: any) => formatName(m.move.name)).sort(),
     selectedMoves: Array.from({ length: 4 }, () => ({ name: '', type: '', damageClass: '', power: null })),
     selectedAbility: abilities[0]?.name,
     selectedNature: '',
     selectedItem: '',
     selectedItemDescription: '',
     speciesColor: speciesHex,
+    speciesName: speciesName,
     dominantColors
   };
 }
@@ -336,4 +369,30 @@ export async function fetchMoveDetails(moveName: string): Promise<MoveDetails> {
     damageClass: data.damage_class.name,
     effect: effectText,
   };
+}
+
+export async function fetchEvolutionChain(pokemonId: number): Promise<string[]> {
+  try {
+    const speciesRes = await fetch(`https://pokeapi.co/api/v2/pokemon-species/${pokemonId}/`);
+    if (!speciesRes.ok) return [];
+    const speciesData = await speciesRes.json();
+    
+    const chainRes = await fetch(speciesData.evolution_chain.url);
+    if (!chainRes.ok) return [];
+    const chainData = await chainRes.json();
+    
+    const names: string[] = [];
+    let current = chainData.chain;
+    
+    const traverse = (node: any) => {
+      names.push(node.species.name);
+      node.evolves_to.forEach((evolution: any) => traverse(evolution));
+    };
+    
+    traverse(current);
+    return names;
+  } catch (e) {
+    console.error("Evolution Fetch Error:", e);
+    return [];
+  }
 }

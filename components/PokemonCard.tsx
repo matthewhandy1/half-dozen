@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PokemonData, MoveDetails, SelectedMove } from '../types';
 import { POKEMON_TYPES, TYPE_COLORS } from '../constants';
-import { Search, X, Edit3, Disc, Check, Settings2, Zap, ShieldCheck, Trash2, PackagePlus, Info, Fingerprint, Save, Loader2, LayoutGrid } from 'lucide-react';
-import { fetchPokemon, fetchMoveDetails } from '../services/pokeApi';
+import { Search, X, Edit3, Disc, Check, Settings2, Zap, ShieldCheck, Trash2, PackagePlus, Info, Fingerprint, Save, Loader2, LayoutGrid, ArrowUpCircle } from 'lucide-react';
+import { fetchPokemon, fetchMoveDetails, fetchEvolutionChain } from '../services/pokeApi';
 import { ControlTooltip, AbilityTooltip } from './PokemonSharedUI';
 import { MoveSearchSelector } from './PokemonSelectors';
 import { PokemonPickerModal } from './PokemonPickerModal';
@@ -32,15 +32,51 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({
   const [isArchitectOpen, setIsArchitectOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tempNickname, setTempNickname] = useState('');
+  const [evolutionChain, setEvolutionChain] = useState<string[]>([]);
+  const [isEvolving, setIsEvolving] = useState(false);
   
   const supportsAbilities = generation >= 3;
 
+  useEffect(() => {
+    if (isArchitectOpen && pokemon) {
+      fetchEvolutionChain(pokemon.id).then(setEvolutionChain);
+    }
+  }, [isArchitectOpen, pokemon?.id]);
+
   const handleSearch = async (val: string | number) => {
     try {
-      const data = await fetchPokemon(val);
+      const data = await fetchPokemon(val, generation);
       onSelect(index, data);
       setIsPickerOpen(false);
     } catch (err) { console.error(err); }
+  };
+
+  const handleEvolve = async () => {
+    if (!pokemon || isEvolving || !pokemon.speciesName) return;
+    
+    const currentIndex = evolutionChain.indexOf(pokemon.speciesName);
+    if (currentIndex === -1 || currentIndex === evolutionChain.length - 1) return;
+    
+    const nextSpecies = evolutionChain[currentIndex + 1];
+    setIsEvolving(true);
+    
+    try {
+      const evolvedData = await fetchPokemon(nextSpecies, generation);
+      onSelect(index, {
+        ...evolvedData,
+        nickname: pokemon.nickname,
+        selectedMoves: pokemon.selectedMoves,
+        selectedAbility: pokemon.selectedAbility,
+        selectedNature: pokemon.selectedNature,
+        selectedItem: pokemon.selectedItem,
+        selectedItemDescription: pokemon.selectedItemDescription,
+        customTypes: pokemon.customTypes
+      });
+    } catch (err) {
+      console.error("Evolution failed:", err);
+    } finally {
+      setIsEvolving(false);
+    }
   };
 
   const handleToggleAbility = (abilityName: string) => {
@@ -170,7 +206,19 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({
           </div>
           <div className="flex-1 overflow-y-auto p-6 space-y-8 max-w-4xl mx-auto w-full pb-48 scrollbar-thin">
             <section className="bg-slate-900/40 rounded-[2rem] p-6 border border-slate-800/50">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2"><Fingerprint className="w-4 h-4 text-indigo-400" /> Nickname & Types</h3>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Fingerprint className="w-4 h-4 text-indigo-400" /> Nickname & Types</h3>
+                {evolutionChain.length > 0 && evolutionChain.indexOf(pokemon.name.toLowerCase().replace(/\s+/g, '-')) < evolutionChain.length - 1 && (
+                  <button 
+                    onClick={handleEvolve}
+                    disabled={isEvolving}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                  >
+                    {isEvolving ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowUpCircle className="w-3 h-3" />}
+                    Evolve
+                  </button>
+                )}
+              </div>
               <div className="space-y-4">
                 <input autoFocus className="w-full bg-slate-900 border border-slate-800 text-lg font-black text-white p-5 rounded-2xl outline-none uppercase italic focus:ring-2 focus:ring-indigo-500/50" value={tempNickname} placeholder="Set nickname..." onChange={e => { setTempNickname(e.target.value); onSelect(index, { ...pokemon, nickname: e.target.value }); }} />
                 <div className="grid grid-cols-2 gap-4">

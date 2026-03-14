@@ -4,6 +4,7 @@ import { PokemonCard } from './components/PokemonCard';
 import { TypeChart } from './components/TypeChart';
 import { OffensiveMatrix } from './components/OffensiveMatrix';
 import { TeamStats } from './components/TeamStats';
+import { TeamRecommendations } from './components/TeamRecommendations';
 import { VaultModal } from './components/VaultModal';
 import { InfoModal } from './components/InfoModal';
 import { ContactModal } from './components/ContactModal';
@@ -293,7 +294,7 @@ const App: React.FC = () => {
   }, []);
 
   const reconstructFromDNA = async (dna: any) => {
-    const base = await fetchPokemon(dna.id);
+    const base = await fetchPokemon(dna.id, selectedGen);
     const itemDesc = dna.i ? await fetchItemDescription(dna.i) : '';
     const reconstructedMoves = await Promise.all(
       (dna.m || [null, null, null, null]).map(async (moveName: string | null) => {
@@ -356,6 +357,11 @@ const App: React.FC = () => {
       setAllMovesList(mList);
       setAllItemsList(iList);
 
+      // Re-hydrate team moves when generation changes
+      team.forEach((p, idx) => {
+        if (p) hydrateSlot(idx, p);
+      });
+
       try {
         if (!enemyTeam.some(p => p !== null)) {
           const redTeamData = await Promise.all(
@@ -396,7 +402,7 @@ const App: React.FC = () => {
 
   const hydrateSlot = async (index: number, partialData: PokemonData) => {
     try {
-      const full = await fetchPokemon(partialData.id);
+      const full = await fetchPokemon(partialData.id, selectedGen);
       setTeam(prev => {
         const next = [...prev];
         next[index] = { ...full, ...partialData, stats: full.stats, abilities: full.abilities, availableMoves: full.availableMoves };
@@ -489,7 +495,7 @@ const App: React.FC = () => {
 
   const handleReplacePokemon = async (index: number, identifier: string | number) => {
     try {
-      const pokemon = await fetchPokemon(identifier);
+      const pokemon = await fetchPokemon(identifier, selectedGen);
       const newTeam = [...team];
       newTeam[index] = pokemon;
       setTeam(newTeam);
@@ -795,6 +801,8 @@ const App: React.FC = () => {
           <TypeChart team={team} generation={selectedGen} onReplace={handleReplacePokemon} />
           <OffensiveMatrix team={team} generation={selectedGen} onReplace={handleReplacePokemon} />
         </div>
+
+        <TeamRecommendations team={team} generation={selectedGen} />
 
         <EnemyTeamSection 
           userTeam={team} 

@@ -4,9 +4,10 @@ import {
   X, Fingerprint, Users, Package, ShieldAlert, 
   Save, Copy, Check, Upload, Trash2, Edit3, 
   Calendar, Trophy, User, RefreshCw,
-  Share2, Zap, Download, Loader2, Dna,
+  Share2, Download, Loader2, Dna,
   UserCheck, BadgeCheck, AlertTriangle, FileText,
-  Map, History, Database, LayoutGrid, Link as LinkIcon
+  Map, History, Database, LayoutGrid, Link as LinkIcon,
+  Crown
 } from 'lucide-react';
 import { TYPE_COLORS } from '../constants';
 import { fetchPokemon, fetchMoveDetails, fetchItemDescription, fetchPokemonBasic } from '../services/pokeApi';
@@ -88,7 +89,7 @@ const decompressHelper = async (encoded: string) => {
 };
 
 export const VaultModal: React.FC<VaultModalProps> = (props) => {
-  const [currentTab, setCurrentTab] = useState(props.activeTab);
+  const [currentTab, setCurrentTab] = useState<'profile' | 'teams' | 'box' | 'intel'>(props.activeTab);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [tempProfile, setTempProfile] = useState({ 
     name: props.profile.name, 
@@ -398,7 +399,7 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
                 </button>
               ))}
             </div>
-            <div className="hidden sm:block mt-auto pt-4 border-t border-slate-800/50 space-y-3">
+            <div className="mt-auto pt-4 border-t border-slate-800/50 space-y-3">
               <button onClick={() => { setExchangeCode(''); setExchangeMode('showdown'); }} className="w-full flex items-center justify-center gap-2 py-4 bg-red-600/10 hover:bg-red-600/20 text-red-400 border border-red-500/20 rounded-2xl font-black uppercase text-[10px] transition-all">Showdown Import</button>
               <button onClick={() => { setExchangeCode(''); setExchangeMode('import'); }} className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 rounded-2xl font-black uppercase text-[10px] transition-all">Import Item</button>
             </div>
@@ -494,17 +495,19 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
                     {props.onLogout && (
                       <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 space-y-4 shadow-xl md:col-span-2">
                         <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Account Management</h4>
-                        <button 
-                          onClick={() => {
-                            if (confirm("Are you sure you want to log out?")) {
-                              props.onLogout?.();
-                              props.onClose();
-                            }
-                          }}
-                          className="w-full py-4 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/20 rounded-2xl font-black uppercase text-[10px] sm:text-xs transition-all flex items-center justify-center gap-2"
-                        >
-                          Sign Out of Architect Account
-                        </button>
+                        <div className="grid grid-cols-1 gap-4">
+                          <button 
+                            onClick={() => {
+                              if (confirm("Are you sure you want to log out?")) {
+                                props.onLogout?.();
+                                props.onClose();
+                              }
+                            }}
+                            className="w-full py-4 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/20 rounded-2xl font-black uppercase text-[10px] sm:text-xs transition-all flex items-center justify-center gap-2"
+                          >
+                            Sign Out of Architect Account
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -517,7 +520,7 @@ export const VaultModal: React.FC<VaultModalProps> = (props) => {
                     {[
                       { id: 'gym', label: 'Gym Leaders', icon: Trophy },
                       { id: 'elite', label: 'Elite Four', icon: BadgeCheck },
-                      { id: 'champion', label: 'Champions', icon: Zap },
+                      { id: 'champion', label: 'Champions', icon: Crown },
                       { id: 'rival', label: 'Saved Rivals', icon: Map }
                     ].map(cat => (
                       <button 
